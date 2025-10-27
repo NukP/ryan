@@ -226,7 +226,7 @@ def auto_dgbowl(multi_processing: bool = True, **kwargs) -> None:
     Returns:
         None
     """
-    data_root = Path("Recipe") / "data_for_dgbowl"
+    data_root = Path("temp") / "data_for_dgbowl"
     dirs = sorted([p for p in data_root.iterdir() if p.is_dir()])
 
     if not dirs:

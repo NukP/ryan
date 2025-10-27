@@ -1,0 +1,108 @@
+version: '2.1'
+load:
+  - as: dg
+    path: $PATCH.nc
+    type: netcdf
+  - as: electrodata
+    path: $PATCH.electro.pkl
+    type: table
+  - as: peis
+    path: $PATCH.peis.pkl
+    type: table
+extract:
+  - into: df
+    from: dg
+    at:
+      step: gas_products
+    columns:
+      - key: concentration->*
+        as: xout
+  - into: df
+    from: electrodata
+    columns:
+      - key: I
+        as: I
+      - key: Ewe
+        as: Ewe
+  - into: df
+    from: dg
+    at:
+      step: outlet_flow
+    columns:
+      - key: Flow (nml per min)
+        as: fout
+  - into: df
+    from: peis
+    columns:
+      - key: min Re(Z)
+        as: R
+  - into: df
+    from: null
+    constants:
+      - value: 8.5
+        as: pH
+      - value: 0
+        units: degC
+        as: Tref
+      - value: 0.197
+        units: V
+        as: Eref
+      - value: 22.5
+        units: ml/min
+        as: fin
+      - value: 1
+        as: xin->CO2
+  - into: df
+    from: dg
+    at: 
+      step: temperature
+    columns:
+      - key: Cell temperature (C)
+        as: T
+      - key: Room temperature (C)
+        as: T_ambient
+  - into: df
+    from: dg
+    at:
+      step: "pressure"
+    columns:
+      - key: Gas(Read)[mbar]
+        as: P_gas
+      - key: Liquid(Read)[mbar]
+        as: P_liquid
+transform:
+  - table: df
+    with: rates.flow_to_molar
+    using:
+      - flow: fout
+        x: xout
+        Tref: Tref
+        output: nout
+      - flow: fin
+        x: xin
+        Tref: Tref
+        output: nin
+  - table: df
+    with: electrochemistry.nernst
+    using:
+      - Ewe: Ewe
+        Eref: Eref
+        R: R
+        I: I
+        pH: pH
+        T: T
+  - table: df
+    with: electrochemistry.fe
+    using:
+      - rate: nout
+        I: I
+        charges:
+          C: 4
+          H: 1
+          O: -2
+save:
+  - table: df
+    as: $PATCH.GCdata.pkl
+  - table: df
+    as: $PATCH.GCdata.xlsx
+    sigma: False

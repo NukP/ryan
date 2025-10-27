@@ -1,0 +1,112 @@
+version: '2.1'
+load:
+  - as: dg
+    path: $PATCH.nc
+    type: netcdf
+  - as: electrodata
+    path: $PATCH.electro.pkl
+    type: table   
+  - as: peis
+    path: $PATCH.peis.pkl
+    type: table
+extract:
+  - into: df
+    from: dg
+    at:
+      step: liquid_products
+    columns:
+      - key: concentration
+        as: concentration
+  - into: df
+    from: electrodata
+    columns:
+      - key: Q
+        as: Q
+      - key: Ewe
+        as: Ewe
+      - key: I
+        as: I  
+  - into: df
+    from: dg
+    at:
+      step: outlet_flow
+    columns:
+      - key: Flow (nml per min)
+        as: fout
+  - into: df
+    from: peis
+    columns:
+      - key: min Re(Z)
+        as: R
+  - into: df
+    constants:
+      - value: 8.5
+        as: pH
+      - value: 0
+        units: degC
+        as: Tref
+      - value: 20
+        units: degC
+        as: T
+      - value: 0.197
+        units: V
+        as: Eref
+      - value: 22.5
+        units: ml/min
+        as: fin
+      - value: 1
+        as: xin->CO2
+      - value: 100
+        units: ml
+        as: V
+transform:
+  - table: df
+    with: electrochemistry.average_current
+    using:
+      - Q: Q
+        output: <I>  
+  - table: df
+    with: rates.flow_to_molar
+    using:
+      - flow: fin
+        x: xin
+        Tref: Tref
+        output: nin
+  - table: df
+    with: rates.batch_to_molar
+    using:
+      - c: concentration
+        V: V
+        output: nout
+  - table: df
+    with: electrochemistry.nernst
+    using:
+      - Ewe: Ewe
+        Eref: Eref
+        R: R
+        I: I
+        pH: pH
+        T: T
+  - table: df
+    with: electrochemistry.fe
+    using:
+      - rate: nout
+        I: I
+        charges:
+          C: 4
+          H: 1
+          O: -2
+  - table: df
+    with: catalysis.conversion
+    using:
+      - feedstock: CO2
+        type: mixed
+        rin: nin
+        rout: nout
+        output: Xpm        
+save:
+  - table: df
+    as: $PATCH.LCdata.pkl
+  - table: df
+    as: $PATCH.LCdata.xlsx
+    sigma: False   

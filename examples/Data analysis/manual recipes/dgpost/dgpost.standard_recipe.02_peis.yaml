@@ -1,0 +1,34 @@
+version: '2.1'
+load:
+  - as: dg
+    path: $patch.nc
+    type: netcdf
+extract:
+  - into: peis
+    from: dg
+    at:
+      step: impedance
+    columns:
+      - key: freq
+        as: freq
+      - key: Re(Z)
+        as: real
+      - key: -Im(Z)
+        as: imag
+      - key: cycle number
+        as: cycle
+pivot:
+  - table: peis
+    as: traces
+    using: cycle
+    columns: [freq, real, imag]
+    timestamp: first
+transform:
+  - table: traces
+    with: impedance.lowest_real_impedance
+    using:
+      - real: real
+        imag: imag
+save:
+  - table: traces
+    as: $PATCH.peis.pkl

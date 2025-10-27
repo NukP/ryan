@@ -1,0 +1,41 @@
+version: '2.1'
+load:
+  - as: dg
+    path: $patch.nc
+    type: netcdf
+extract:
+  - into: df
+    from: dg
+    at:
+      step: electrochemistry
+    columns:
+      - key: I
+        as: I1
+      - key: <I>
+        as: I2
+      - key: Ewe
+        as: Ewe1
+      - key: <Ewe>
+        as: Ewe2
+transform:
+  - table: df
+    with: table.combine_columns
+    using:
+      - a: I1
+        b: I2
+        output: I
+        fillnan: true
+      - a: Ewe1
+        b: Ewe2
+        output: Ewe
+  - table: df
+    with: electrochemistry.charge
+    using:
+      - I: I
+        output: Q
+save:
+  - table: df
+    as: $PATCH.electro.pkl
+  - table: df
+    as: $PATCH.electro.xlsx
+    sigma: False

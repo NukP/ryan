@@ -1,0 +1,84 @@
+metadata:
+    provenance:
+        type: manual
+    version: "4.2"
+    timezone: Europe/Berlin
+steps:  
+  - parser: electrochem
+    input:
+        folders: ["."]
+        suffix: "mpr"
+        contains: "PEIS"
+    parameters:
+        filetype: "eclab.mpr"
+    tag: impedance
+  - parser: electrochem
+    input:
+        folders: ["."]
+        suffix: "mpr"
+    parameters:
+        filetype: "eclab.mpr"
+        transpose: false
+    tag: electrochemistry
+  - parser: basiccsv
+    input:
+        folders: ["."]
+        suffix: "csv"
+        contains: "flow_for_yadg"
+    parameters:
+        timestamp:
+            uts:
+                index: 0
+        strip: \"
+        units:
+            Flow (nml per min): smL/min
+    tag: outlet_flow
+  - parser: chromdata
+    input:
+        folders: ["."]
+        suffix: "zip"
+        contains: "GC"
+    parameters: 
+        filetype: "fusion.zip"
+    tag: gas_products
+  - parser: chromdata
+    input:
+        folders: ["."]
+        suffix: "xlsx"
+        contains: "LC"
+    externaldate:
+        using:
+            filename:
+                format: "%Y-%m-%d-%H-%M-%S%z"
+                len: 24 
+    parameters:
+        filetype: "empalc.xlsx"
+    tag: liquid_products
+  - parser: basiccsv
+    input:
+        folders: ["."]
+        suffix: "csv"
+        contains: "temperature_for_yadg"
+    parameters:
+        timestamp:
+            uts:
+                index: 0
+        strip: \"
+        units:
+            Cell temperature (C): degC
+            Room temperature (C): degC
+    tag: temperature
+  - parser: basiccsv
+    input:
+        folders: ["."]
+        suffix: "csv"
+        contains: "pressure_for_yadg"
+    parameters:
+        timestamp:
+            uts:
+                index: 0
+        strip: \"
+        units:
+            Gas(Read)[mbar]: mbar
+            Liquid(Read)[mbar]: mbar
+    tag: pressure

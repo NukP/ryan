@@ -42,11 +42,8 @@ analysis = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.hatch.build]
-sources = ["src"]
-
 [tool.hatch.build.targets.wheel]
-packages = ["ryan"]
+packages = ["src/ryan"]
 
 [tool.ty.environment]
 python = "./.venv"

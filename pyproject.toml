@@ -50,7 +50,9 @@ ml_pipeline = [
     "xgboost",
     "shap",
     "pandas",
-    "seaborn"
+    "seaborn",
+    "ipykernel",
+    "ipywidgets"
 ]
 
 [build-system]

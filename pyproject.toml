@@ -39,6 +39,20 @@ analysis = [
     "PyQt5"
 ]
 
+ml_pipeline = [
+    "tqdm",
+    "numpy",
+    "openpyxl",
+    "xarray",
+    "matplotlib",
+    "plotly",
+    "scikit-learn",
+    "xgboost",
+    "shap",
+    "pandas",
+    "seaborn"
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

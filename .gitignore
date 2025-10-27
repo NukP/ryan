@@ -1,2 +1,5 @@
 *.DS_Store
 *.pyc
+examples/Data analysis/Data/
+examples/Data analysis/Output/
+examples/Data analysis/Data/Graph export

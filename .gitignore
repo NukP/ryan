@@ -2,4 +2,5 @@
 *.pyc
 examples/Data analysis/Data/
 examples/Data analysis/Output/
+examples/Data analysis/Recipe
 examples/Data analysis/Data/Graph export

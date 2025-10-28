@@ -35,8 +35,7 @@ analysis = [
     "yadg",
     "dgpost",
     "ipykernel",
-    "silx",
-    "PyQt5"
+    "silx[qt]",
 ]
 
 ml_pipeline = [

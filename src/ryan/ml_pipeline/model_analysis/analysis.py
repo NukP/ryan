@@ -8,8 +8,6 @@ from sklearn.metrics import r2_score, root_mean_squared_error
 from xgboost import XGBRegressor
 import plotly.graph_objects as go
 import numpy as np
-import matplotlib.pyplot as plt
-from pathlib import Path    
 from . import features
 
 def cross_val_and_plot(X_numerical:list,

@@ -1,5 +1,6 @@
 *.DS_Store
 *.pyc
+uv.lock
 examples/Data analysis/Data/
 examples/Data analysis/Output/
 examples/Data analysis/Recipe

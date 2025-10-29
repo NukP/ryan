@@ -51,7 +51,8 @@ ml_pipeline = [
     "pandas",
     "seaborn",
     "ipykernel",
-    "ipywidgets"
+    "ipywidgets",
+    "nbformat"
 ]
 
 [build-system]

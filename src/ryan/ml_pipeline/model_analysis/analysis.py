@@ -8,6 +8,8 @@ from sklearn.metrics import r2_score, root_mean_squared_error
 from xgboost import XGBRegressor
 import plotly.graph_objects as go
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 from . import features
 
 def cross_val_and_plot(X_numerical:list,
@@ -202,3 +204,57 @@ def cross_val_and_plot(X_numerical:list,
 
         # Show the Residual plot
         residual_fig.show()
+
+def plot_correlation_matrix(df_dataset:pd.DataFrame,
+                            ls_columns:list = [f for f in (features.PRODUCTS + features.X_RAW_DATA + features.X_METADATA_NUMERICAL + features.X_ENGINEERED) if f != "cathode_catalyst_loading"],
+                            save_fig:bool = False) -> None:
+    """
+    Plot Pearson and Spearman correlation matrices for the given dataset.
+
+    Args:
+        df_dataset (pd.DataFrame): The dataset containing features and target variables.
+        ls_columns (list): List of columns to include in the correlation matrix.
+                            In this default, cathode_catalyst_loading is excluded as we found the value are all 0.5.
+        savefig (bool): Whether to save the figures as PNG files. Default is False.
+
+    Returns:
+        None
+    """
+    df_to_calculate = pd.concat([df_dataset[ls_columns]], axis=1).dropna()
+    df_to_calculate = df_to_calculate.fillna(df_to_calculate.mean())  # Fill NaNs with column mean
+    pearson_corr = df_to_calculate.corr(method='pearson')
+    spearmann_corr = df_to_calculate.corr(method='spearman')
+    
+    ls_to_plot = [pearson_corr, spearmann_corr]
+    ls_titles = ['Pearson Correlation Matrix', 'Spearman Correlation Matrix']
+    for idx, corr_matrix in enumerate(ls_to_plot):
+        plt.figure(figsize=(40, 40))
+
+        # Get minimum and maximum correlation for tick range
+        min_val = corr_matrix.min().min()
+        max_val = corr_matrix.max().max()
+
+        # Create heatmap with cbar_kws for controlling the colorbar
+        ax = sns.heatmap(
+            corr_matrix, 
+            annot=True, 
+            cmap='coolwarm', 
+            fmt='.3f',
+            cbar_kws={
+                'shrink': 0.8,                # Adjust colorbar size
+                'ticks': np.linspace(min_val, max_val, 21)  # More frequent ticks
+            }
+        )
+
+            # Make title larger and bold
+        plt.title(ls_titles[idx], fontsize=20, fontweight='bold')
+        
+        # Optionally adjust colorbar label sizes
+        cbar = ax.collections[0].colorbar
+        cbar.ax.tick_params(labelsize=12)
+        if save_fig:
+            filename_no_ext = ls_titles[idx].replace(" ", "_")
+            filename_ext = filename_no_ext + ".png"
+            plt.savefig(filename_ext, bbox_inches='tight')
+            plt.show()
+

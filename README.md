@@ -5,6 +5,7 @@ Repository to host a pipeline for electrocatalysis CO2 reduction data analysis a
 
 This project uses **uv** to manage dependency groups defined in `pyproject.toml`.  
 If you want to work on the codebase in editable mode while using **Conda** for the Python environment, follow the steps below.
+This will allow one to have conda environment called ryan that can be applied and used in many jupyter notebook in various directory.
 
 
 1. Create a new Conda environment (modify the name if desired)

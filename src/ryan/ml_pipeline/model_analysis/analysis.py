@@ -2,13 +2,17 @@
 This module contains function to analyze the model performance.
 """
 
-from typing import Optional
+from pathlib import Path
+from typing import List, Optional, Union
 
+import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import seaborn as sns
+import shap
+from IPython.display import display
 from sklearn.metrics import r2_score, root_mean_squared_error
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
@@ -328,3 +332,93 @@ def plot_commulative_histogram(
         filename = f"{dir_save_fig}/{column_name}_cumulative_histogram.png"
         plt.savefig(filename, bbox_inches="tight")
     plt.show()
+
+
+def compute_shap_feature_importance(
+    dir_dataset: Union[Path, str],
+    ls_numerical_columns: List[str],
+    ls_categorical_columns: List[str],
+    model_object: Union[Path, str],
+    target_column: str,
+    dropna: bool = True,
+) -> pd.DataFrame:
+    """
+    Compute SHAP-based feature importance for a trained tree-based model.
+
+    Args:
+        dir_dataset: Path to the Excel dataset file.
+        ls_numerical_column: List of numerical feature column names.
+        categorical_columns: List of categorical feature column names.
+        model_object: Path to a serialized model object (.pkl).
+        target_column: Name to show in the print header (e.g., a product/target label).
+        dropna: If True, drop rows with any NA before processing.
+
+    Returns:
+        pd.DataFrame: Feature importance table with columns:
+            ['feature', 'relative_importance',
+             'normalized_relative_importance (%)',
+             'cumulative_importance (%)']
+             Indexed starting from 1 (rank order).
+    """
+    # Ensure paths
+    dir_dataset = Path(dir_dataset)
+    model_object = Path(model_object)
+
+    # Load data (work on a copy to keep original safe)
+    df_raw = pd.read_excel(dir_dataset)
+    df = df_raw.copy()
+    if dropna:
+        df = df.dropna()
+
+    # Build X: cast categoricals, keep numericals
+    X_num = df[ls_numerical_columns]
+    X_cat = df[ls_categorical_columns].apply(lambda col: col.astype("category"))
+    X = pd.concat([X_num, X_cat], axis=1)
+
+    # Scale numeric columns only
+    scaler = StandardScaler()
+    X_scaled = X.copy()
+    X_scaled[ls_numerical_columns] = scaler.fit_transform(X[ls_numerical_columns])
+
+    # Load model
+    model = joblib.load(model_object)
+
+    # SHAP
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(X_scaled)
+
+    # Mean absolute SHAP -> relative importance
+    feature_importance = np.abs(shap_values).mean(axis=0)
+
+    feature_importance_df = (
+        pd.DataFrame({
+            "feature": X_scaled.columns,
+            "relative_importance": feature_importance,
+        })
+        .sort_values(by="relative_importance", ascending=False)
+        .reset_index(drop=True)
+    )
+
+    # Normalize to percentage and cumulative
+    total = feature_importance_df["relative_importance"].sum()
+    feature_importance_df["normalized_relative_importance (%)"] = (
+        feature_importance_df["relative_importance"] / total * 100.0
+    )
+    feature_importance_df["cumulative_importance (%)"] = feature_importance_df[
+        "normalized_relative_importance (%)"
+    ].cumsum()
+
+    # Rank index starts from 1
+    feature_importance_df.index = feature_importance_df.index + 1
+
+    # Output
+    print(f"Feature importance for {target_column}")
+    display(
+        feature_importance_df.style.format({
+            "relative_importance": "{:.2f}",
+            "normalized_relative_importance (%)": "{:.2f}",
+            "cumulative_importance (%)": "{:.2f}",
+        })
+    )
+
+    return feature_importance_df

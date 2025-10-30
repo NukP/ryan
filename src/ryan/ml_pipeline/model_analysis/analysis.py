@@ -335,10 +335,9 @@ def plot_commulative_histogram(
 
 def compute_shap_feature_importance(
     dir_dataset: Union[Path, str],
-    ls_numerical_columns: List[str],
-    ls_categorical_columns: List[str],
     model_object: Union[Path, str],
-    target_column: str,
+    ls_numerical_columns: List[str] = features.X_ALL_NUMERICAL,
+    ls_categorical_columns: List[str] = features.X_METADATA_CATEGORICAL,
     dropna: bool = True,
 ) -> pd.DataFrame:
     """

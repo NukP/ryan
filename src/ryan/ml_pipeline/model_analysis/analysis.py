@@ -411,14 +411,4 @@ def compute_shap_feature_importance(
     # Rank index starts from 1
     feature_importance_df.index = feature_importance_df.index + 1
 
-    # Output
-    print(f"Feature importance for {target_column}")
-    display(
-        feature_importance_df.style.format({
-            "relative_importance": "{:.2f}",
-            "normalized_relative_importance (%)": "{:.2f}",
-            "cumulative_importance (%)": "{:.2f}",
-        })
-    )
-
     return feature_importance_df

@@ -504,14 +504,14 @@ def plot_shap_scatter_checkbox(
         width=1400 * 0.9,
         height=600 * 0.9,
         showlegend=True,
-        font=dict(size=16, color="black"),  # global font bump
+        font=dict(size=16, color="black"),
         legend=dict(
             title="Products",
             orientation="v",
             y=0.5,
             yanchor="middle",
             x=-0.18,
-            xanchor="right",  # << left of plot area
+            xanchor="right",
             bgcolor="rgba(255,255,255,0.0)",
             bordercolor="rgba(0,0,0,0)",
             font=dict(size=16, color="black"),

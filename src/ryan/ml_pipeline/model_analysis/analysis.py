@@ -425,26 +425,9 @@ def plot_shap_scatter_checkbox(
     color_CH4: str = "deeppink",
     dropna: bool = True,
 ) -> None:
-    """
-    Plot SHAP scatter for one feature across three models (fe-H2, fe-C2H4, fe-CH4).
-    Accepts either model objects or paths to saved models. Handles data prep inside.
-
-    Args:
-        column_name: Feature to plot on the x-axis.
-        dir_dataset: Path to the Excel dataset (.xlsx).
-        dir_model_h2, dir_model_c2h4, dir_model_ch4:
-            Either trained model objects (XGBRegressor/Booster-compatible)
-            or paths to model files (.pkl, .json, .ubj).
-        ls_numerical_columns, ls_categorical_columns:
-            Optional custom feature lists; defaults taken from `features` module.
-        color_H2, color_C2H4, color_CH4: Marker colors.
-        dropna: Drop rows with NA before processing.
-    """
-
-    # -------- helpers inside the function (as you prefer) --------
-    def _ensure_model(model_or_path: Union[str, Path, XGBRegressor]):
-        """Return an XGBRegressor (or Booster-compatible) given a model object or filepath."""
-        if isinstance(model_or_path, (XGBRegressor,)):
+    # --- helpers in-function ---
+    def _ensure_model(model_or_path):
+        if isinstance(model_or_path, XGBRegressor):
             return model_or_path
         p = Path(model_or_path)
         ext = p.suffix.lower()
@@ -457,148 +440,122 @@ def plot_shap_scatter_checkbox(
         raise ValueError(f"Unsupported model type/path: {model_or_path}")
 
     def _shap_for_model(model, X_in: pd.DataFrame) -> np.ndarray:
-        """Compute SHAP values; if list (multiclass), average abs across classes."""
-        explainer = shap.TreeExplainer(model)
-        sv = explainer.shap_values(X_in)
+        exp = shap.TreeExplainer(model)
+        sv = exp.shap_values(X_in)
         if isinstance(sv, list):
-            return np.mean([np.abs(v) for v in sv], axis=0)
+            return np.mean([np.abs(a) for a in sv], axis=0)
         return sv
 
-    # -------- resolve defaults safely --------
+    # --- defaults from your features module ---
     if ls_numerical_columns is None:
         ls_numerical_columns = list(features.X_ALL_NUMERICAL)
     else:
         ls_numerical_columns = list(ls_numerical_columns)
-
     if ls_categorical_columns is None:
         ls_categorical_columns = list(features.X_METADATA_CATEGORICAL)
     else:
         ls_categorical_columns = list(ls_categorical_columns)
 
-    # -------- load data and prepare X/X_scaled --------
+    # --- load & prep data ---
     dir_dataset = Path(dir_dataset)
     df = pd.read_excel(dir_dataset)
     if dropna:
         df = df.dropna()
-
-    # Cast categoricals
-    df[ls_categorical_columns] = df[ls_categorical_columns].apply(lambda col: col.astype("category"))
-
-    # Build X
+    df[ls_categorical_columns] = df[ls_categorical_columns].apply(lambda c: c.astype("category"))
     X = pd.concat([df[ls_numerical_columns], df[ls_categorical_columns]], axis=1)
-
     if column_name not in X.columns:
         raise ValueError(f"'{column_name}' not found in dataset columns.")
-
-    # Scale only numericals
     scaler = StandardScaler()
     X_scaled = X.copy()
     X_scaled[ls_numerical_columns] = scaler.fit_transform(X[ls_numerical_columns])
 
-    # -------- load/resolve models --------
+    # --- models & SHAP ---
     model_H2 = _ensure_model(dir_model_h2)
     model_C2H4 = _ensure_model(dir_model_c2h4)
     model_CH4 = _ensure_model(dir_model_ch4)
 
-    # -------- SHAP --------
     shap_H2 = _shap_for_model(model_H2, X_scaled)
     shap_C2H4 = _shap_for_model(model_C2H4, X_scaled)
     shap_CH4 = _shap_for_model(model_CH4, X_scaled)
 
-    feat_idx = X_scaled.columns.get_loc(column_name)
+    idx = X_scaled.columns.get_loc(column_name)
     x_vals = X[column_name]
 
-    # -------- plot --------
+    # --- figure (no tabs; boxed axes; legend on the left; larger fonts) ---
     fig = go.Figure()
-
+    fig.add_trace(
+        go.Scatter(x=x_vals, y=shap_H2[:, idx], mode="markers", marker=dict(color=color_H2, opacity=0.35), name="fe-H₂")
+    )
     fig.add_trace(
         go.Scatter(
-            x=x_vals, y=shap_H2[:, feat_idx], mode="markers", marker=dict(color=color_H2, opacity=0.35), name="fe-H2"
+            x=x_vals, y=shap_C2H4[:, idx], mode="markers", marker=dict(color=color_C2H4, opacity=0.35), name="fe-C₂H₄"
         )
     )
     fig.add_trace(
         go.Scatter(
-            x=x_vals,
-            y=shap_C2H4[:, feat_idx],
-            mode="markers",
-            marker=dict(color=color_C2H4, opacity=0.35),
-            name="fe-C2H4",
-        )
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=x_vals, y=shap_CH4[:, feat_idx], mode="markers", marker=dict(color=color_CH4, opacity=0.35), name="fe-CH4"
+            x=x_vals, y=shap_CH4[:, idx], mode="markers", marker=dict(color=color_CH4, opacity=0.35), name="fe-CH₄"
         )
     )
 
-    # Toggle buttons
     fig.update_layout(
-        updatemenus=[
-            {
-                "type": "buttons",
-                "showactive": True,
-                "direction": "right",
-                "buttons": [
-                    {
-                        "label": "fe-H2",
-                        "method": "update",
-                        "args": [
-                            {"visible": [True, False, False]},
-                            {"title": f"SHAP values for {column_name} - fe-H2"},
-                        ],
-                    },
-                    {
-                        "label": "fe-C2H4",
-                        "method": "update",
-                        "args": [
-                            {"visible": [False, True, False]},
-                            {"title": f"SHAP values for {column_name} - fe-C2H4"},
-                        ],
-                    },
-                    {
-                        "label": "fe-CH4",
-                        "method": "update",
-                        "args": [
-                            {"visible": [False, False, True]},
-                            {"title": f"SHAP values for {column_name} - fe-CH4"},
-                        ],
-                    },
-                    {
-                        "label": "All Products",
-                        "method": "update",
-                        "args": [
-                            {"visible": [True, True, True]},
-                            {"title": f"SHAP values for {column_name} - All Products"},
-                        ],
-                    },
-                ],
-            }
-        ]
-    )
-
-    # Layout
-    fig.update_layout(
-        title=f"SHAP values for {column_name} (Select Products)",
+        title=f"SHAP values for {column_name}",
         xaxis_title=column_name,
         yaxis_title="SHAP value",
-        width=1400,
-        height=600,
+        width=1400 * 0.9,
+        height=600 * 0.9,
         showlegend=True,
-        xaxis=dict(showgrid=True, gridwidth=1, gridcolor="LightGrey"),
-        yaxis=dict(showgrid=True, gridwidth=1, gridcolor="LightGrey"),
+        font=dict(size=16, color="black"),  # global font bump
+        legend=dict(
+            title="Products",
+            orientation="v",
+            y=0.5,
+            yanchor="middle",
+            x=-0.18,
+            xanchor="right",  # << left of plot area
+            bgcolor="rgba(255,255,255,0.0)",
+            bordercolor="rgba(0,0,0,0)",
+            font=dict(size=16, color="black"),
+        ),
         plot_bgcolor="white",
         paper_bgcolor="white",
-        margin=dict(l=40, r=40, b=40, t=40),
+        margin=dict(l=40, r=40, b=60, t=60),
     )
 
-    # Zero line
+    # Boxed axes (top/right lines via mirror)
+    fig.update_xaxes(
+        showline=True,
+        linewidth=2,
+        linecolor="black",
+        mirror=True,
+        showgrid=True,
+        gridwidth=1,
+        gridcolor="LightGrey",
+        tickfont=dict(size=16, color="black"),
+        title_font=dict(size=18, color="black"),
+    )
+    fig.update_yaxes(
+        showline=True,
+        linewidth=2,
+        linecolor="black",
+        mirror=True,
+        showgrid=True,
+        gridwidth=1,
+        gridcolor="LightGrey",
+        tickfont=dict(size=16, color="black"),
+        title_font=dict(size=18, color="black"),
+    )
+
+    # zero line
     fig.add_shape(
         type="line",
-        x0=float(np.nanmin(x_vals)),
+        xref="paper",
+        x0=0,
+        x1=1,  # always full width of plot, zoom-proof
+        yref="y",
         y0=0,
-        x1=float(np.nanmax(x_vals)),
-        y1=0,
+        y1=0,  # y=0 in data coordinates
         line=dict(color="black", width=2, dash="dash"),
+        layer="above",  # ensure visibility above scatter points
     )
 
     fig.show()

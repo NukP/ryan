@@ -10,6 +10,7 @@ import plotly.graph_objects as go
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from typing import Optional
 from . import features
 
 def cross_val_and_plot(X_numerical:list,
@@ -258,3 +259,53 @@ def plot_correlation_matrix(df_dataset:pd.DataFrame,
             plt.savefig(filename_ext, bbox_inches='tight')
             plt.show()
 
+def plot_commulative_histogram(column_name: str,
+                                            df: pd.DataFrame,
+                                            bins: int,
+                                            xlim: Optional[tuple[float, float]] = None,
+                                            dir_save_fig: Optional[str] = None
+                                            ) -> None:
+    """"Plot histogram of a column with cumulative percentage
+    
+    Args:
+    column_name: str: Name of the column to plot
+    df: pd.DataFrame: Dataframe containing the data
+    bins: int: Number of bins for the histogram
+    xlim: tuple(int,int): Tuple with the minimum and maximum values for the x-axis
+    dir_save_fig: str: Directory to save the figure. If None, the figure is not saved.
+
+    Returns:
+    None
+    """
+    _, ax = plt.subplots()
+    ax.minorticks_on()
+    
+    # Get histogram data
+    counts, bins, _ = plt.hist(df[column_name].dropna(), bins=bins, edgecolor='k', alpha=1, color='#FFFFB5')
+
+    # Compute cumulative percentage
+    cumulative_counts = np.cumsum(counts)
+    cumulative_percentage = cumulative_counts / cumulative_counts[-1] * 100  # Convert to percentage
+
+    # Plot cumulative percentage
+    ax2 = ax.twinx()
+    ax2.plot(bins[:-1], cumulative_percentage, color='red', marker='.', linestyle='-' ,alpha=0.5)
+    ax2.set_ylabel('Cumulative Percentage (%)', fontsize=12, color='red')
+    ax2.tick_params(axis='y', colors='black')
+    ax2.set_yticks(np.arange(0, 101, 10))
+    ax2.minorticks_on()
+
+    plt.title(f'Cumulative Distribution of {column_name}')
+    plt.xlabel(column_name, fontsize=12)
+    ax.set_ylabel('Frequency', fontsize=12)
+    ax2.grid(True, which='major', linestyle='-', linewidth=0.5)
+    ax2.set_ylim(0,105)
+
+    if xlim:
+        xmin, xmax = xlim
+        ax.set_xlim(xmin, xmax)
+
+    if dir_save_fig is not None:
+        filename = f"{dir_save_fig}/{column_name}_cumulative_histogram.png"
+        plt.savefig(filename, bbox_inches='tight')
+    plt.show()

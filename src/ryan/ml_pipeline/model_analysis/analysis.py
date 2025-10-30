@@ -12,7 +12,6 @@ import pandas as pd
 import plotly.graph_objects as go
 import seaborn as sns
 import shap
-from IPython.display import display
 from sklearn.metrics import r2_score, root_mean_squared_error
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler

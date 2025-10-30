@@ -1,40 +1,42 @@
 """
 This module contains function to analyze the model performance.
 """
-import pandas as pd
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import KFold
-from sklearn.metrics import r2_score, root_mean_squared_error
-from xgboost import XGBRegressor
-import plotly.graph_objects as go
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
+
 from typing import Optional
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+import seaborn as sns
+from sklearn.metrics import r2_score, root_mean_squared_error
+from sklearn.model_selection import KFold
+from sklearn.preprocessing import StandardScaler
+from xgboost import XGBRegressor
+
 from . import features
 
-def cross_val_and_plot(X_numerical:list,
-                    X_category:list,
-                    df_raw:pd.DataFrame,
-                    y_columns:list=features.PRODUCTS
-                    ) -> None:
+
+def cross_val_and_plot(
+    X_numerical: list, X_category: list, df_raw: pd.DataFrame, y_columns: list = features.PRODUCTS
+) -> None:
     """
     Perform 10-fold cross-validation and plot results for 'fe-H2', 'fe-C2H4', and 'fe-CH4'.
-    
+
     Parameters:
     X_numerical (list): List of numerical column names
     X_category (list): List of categorical column names
     df_raw (pd.DataFrame): The dataset containing both features and target columns
     y_columns (list): List of target column names (default: ['fe-H2', 'fe-C2H4', 'fe-CH4'])
-    
+
     Returns:
     None
     """
     # The three gas products
-    y_columns = ['fe-H2', 'fe-C2H4', 'fe-CH4']
-    
+    y_columns = ["fe-H2", "fe-C2H4", "fe-CH4"]
+
     # Combine numerical and categorical columns into X DataFrame
-    X = pd.concat([df_raw[X_numerical], df_raw[X_category].apply(lambda col: col.astype('category'))], axis=1)
+    X = pd.concat([df_raw[X_numerical], df_raw[X_category].apply(lambda col: col.astype("category"))], axis=1)
 
     # Initialize the scaler for numerical columns
     scaler = StandardScaler()
@@ -94,56 +96,60 @@ def cross_val_and_plot(X_numerical:list,
         fig = go.Figure()
 
         # Add scatter plot for true vs predicted values
-        fig.add_trace(go.Scatter(
-            x=y,
-            y=y_pred,
-            mode='markers',
-            marker=dict(color='dodgerblue', opacity=0.35),
-            name=f'True vs Predicted for {product}'
-        ))
+        fig.add_trace(
+            go.Scatter(
+                x=y,
+                y=y_pred,
+                mode="markers",
+                marker=dict(color="dodgerblue", opacity=0.35),
+                name=f"True vs Predicted for {product}",
+            )
+        )
 
         # Add line for perfect predictions
         max_value = max(y.max(), y_pred.max())
-        fig.add_trace(go.Scatter(
-            x=[0, max_value],
-            y=[0, max_value],
-            mode='lines',
-            line=dict(color='black', dash='dash', width=4),
-            name='Perfect Predictions'
-        ))
+        fig.add_trace(
+            go.Scatter(
+                x=[0, max_value],
+                y=[0, max_value],
+                mode="lines",
+                line=dict(color="black", dash="dash", width=4),
+                name="Perfect Predictions",
+            )
+        )
 
         # Customize layout
         fig.update_layout(
-            title=f'True vs Predicted Values for {product} (After 10-Fold Cross-Validation)',
-            xaxis_title='True (experimental) Faradaic Efficiency',
-            yaxis_title='Predicted Faradaic Efficiency',
+            title=f"True vs Predicted Values for {product} (After 10-Fold Cross-Validation)",
+            xaxis_title="True (experimental) Faradaic Efficiency",
+            yaxis_title="Predicted Faradaic Efficiency",
             legend=dict(x=0.02, y=0.98),
             width=800,
             height=600,
             margin=dict(l=40, r=40, b=40, t=40),
-            plot_bgcolor='white',
-            hovermode='closest',
+            plot_bgcolor="white",
+            hovermode="closest",
             xaxis=dict(
                 showline=True,
                 linewidth=2,
-                linecolor='black',
+                linecolor="black",
                 mirror=True,
-                title_font=dict(size=16, color='black'),
-                tickfont=dict(size=14, color='black')
+                title_font=dict(size=16, color="black"),
+                tickfont=dict(size=14, color="black"),
             ),
             yaxis=dict(
                 showline=True,
                 linewidth=2,
-                linecolor='black',
+                linecolor="black",
                 mirror=True,
-                title_font=dict(size=18, color='black'),
-                tickfont=dict(size=16, color='black')
-            )
+                title_font=dict(size=18, color="black"),
+                tickfont=dict(size=16, color="black"),
+            ),
         )
 
         # Add grid
-        fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
-        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+        fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="LightGray")
+        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="LightGray")
 
         # Show the True vs Predicted plot
         fig.show()
@@ -153,62 +159,73 @@ def cross_val_and_plot(X_numerical:list,
         residual_fig = go.Figure()
 
         # Add scatter plot for residuals
-        residual_fig.add_trace(go.Scatter(
-            x=y,
-            y=residuals,
-            mode='markers',
-            marker=dict(color='deeppink', opacity=0.35),
-            name=f'Residuals for {product}'
-        ))
+        residual_fig.add_trace(
+            go.Scatter(
+                x=y,
+                y=residuals,
+                mode="markers",
+                marker=dict(color="deeppink", opacity=0.35),
+                name=f"Residuals for {product}",
+            )
+        )
 
         # Add horizontal line at zero
-        residual_fig.add_trace(go.Scatter(
-            x=[y.min(), y.max()],
-            y=[0, 0],
-            mode='lines',
-            line=dict(color='black', dash='dash', width=4),
-            name='Zero Residual Line'
-        ))
+        residual_fig.add_trace(
+            go.Scatter(
+                x=[y.min(), y.max()],
+                y=[0, 0],
+                mode="lines",
+                line=dict(color="black", dash="dash", width=4),
+                name="Zero Residual Line",
+            )
+        )
 
         # Customize layout for residual plot
         residual_fig.update_layout(
-            title=f'Residual Plot for {product} (After 10-Fold Cross-Validation)',
-            xaxis_title='True (experimental) Faradaic Efficiency',
-            yaxis_title='Residuals (Predicted - True)',
+            title=f"Residual Plot for {product} (After 10-Fold Cross-Validation)",
+            xaxis_title="True (experimental) Faradaic Efficiency",
+            yaxis_title="Residuals (Predicted - True)",
             legend=dict(x=0.02, y=0.98),
             width=800,
             height=600,
             margin=dict(l=40, r=40, b=40, t=40),
-            plot_bgcolor='white',
-            hovermode='closest',
+            plot_bgcolor="white",
+            hovermode="closest",
             xaxis=dict(
                 showline=True,
                 linewidth=2,
-                linecolor='black',
+                linecolor="black",
                 mirror=True,
-                title_font=dict(size=16, color='black'),
-                tickfont=dict(size=14, color='black')
+                title_font=dict(size=16, color="black"),
+                tickfont=dict(size=14, color="black"),
             ),
             yaxis=dict(
                 showline=True,
                 linewidth=2,
-                linecolor='black',
+                linecolor="black",
                 mirror=True,
-                title_font=dict(size=18, color='black'),
-                tickfont=dict(size=16, color='black')
-            )
+                title_font=dict(size=18, color="black"),
+                tickfont=dict(size=16, color="black"),
+            ),
         )
 
         # Add grid
-        residual_fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
-        residual_fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGray')
+        residual_fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="LightGray")
+        residual_fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="LightGray")
 
         # Show the Residual plot
         residual_fig.show()
 
-def plot_correlation_matrix(df_dataset:pd.DataFrame,
-                            ls_columns:list = [f for f in (features.PRODUCTS + features.X_RAW_DATA + features.X_METADATA_NUMERICAL + features.X_ENGINEERED) if f != "cathode_catalyst_loading"],
-                            save_fig:bool = False) -> None:
+
+def plot_correlation_matrix(
+    df_dataset: pd.DataFrame,
+    ls_columns: list = [
+        f
+        for f in (features.PRODUCTS + features.X_RAW_DATA + features.X_METADATA_NUMERICAL + features.X_ENGINEERED)
+        if f != "cathode_catalyst_loading"
+    ],
+    save_fig: bool = False,
+) -> None:
     """
     Plot Pearson and Spearman correlation matrices for the given dataset.
 
@@ -223,11 +240,11 @@ def plot_correlation_matrix(df_dataset:pd.DataFrame,
     """
     df_to_calculate = pd.concat([df_dataset[ls_columns]], axis=1).dropna()
     df_to_calculate = df_to_calculate.fillna(df_to_calculate.mean())  # Fill NaNs with column mean
-    pearson_corr = df_to_calculate.corr(method='pearson')
-    spearmann_corr = df_to_calculate.corr(method='spearman')
-    
+    pearson_corr = df_to_calculate.corr(method="pearson")
+    spearmann_corr = df_to_calculate.corr(method="spearman")
+
     ls_to_plot = [pearson_corr, spearmann_corr]
-    ls_titles = ['Pearson Correlation Matrix', 'Spearman Correlation Matrix']
+    ls_titles = ["Pearson Correlation Matrix", "Spearman Correlation Matrix"]
     for idx, corr_matrix in enumerate(ls_to_plot):
         plt.figure(figsize=(40, 40))
 
@@ -237,36 +254,38 @@ def plot_correlation_matrix(df_dataset:pd.DataFrame,
 
         # Create heatmap with cbar_kws for controlling the colorbar
         ax = sns.heatmap(
-            corr_matrix, 
-            annot=True, 
-            cmap='coolwarm', 
-            fmt='.3f',
+            corr_matrix,
+            annot=True,
+            cmap="coolwarm",
+            fmt=".3f",
             cbar_kws={
-                'shrink': 0.8,                # Adjust colorbar size
-                'ticks': np.linspace(min_val, max_val, 21)  # More frequent ticks
-            }
+                "shrink": 0.8,  # Adjust colorbar size
+                "ticks": np.linspace(min_val, max_val, 21),  # More frequent ticks
+            },
         )
 
-            # Make title larger and bold
-        plt.title(ls_titles[idx], fontsize=20, fontweight='bold')
-        
+        # Make title larger and bold
+        plt.title(ls_titles[idx], fontsize=20, fontweight="bold")
+
         # Optionally adjust colorbar label sizes
         cbar = ax.collections[0].colorbar
         cbar.ax.tick_params(labelsize=12)
         if save_fig:
             filename_no_ext = ls_titles[idx].replace(" ", "_")
             filename_ext = filename_no_ext + ".png"
-            plt.savefig(filename_ext, bbox_inches='tight')
+            plt.savefig(filename_ext, bbox_inches="tight")
             plt.show()
 
-def plot_commulative_histogram(column_name: str,
-                                            df: pd.DataFrame,
-                                            bins: int,
-                                            xlim: Optional[tuple[float, float]] = None,
-                                            dir_save_fig: Optional[str] = None
-                                            ) -> None:
-    """"Plot histogram of a column with cumulative percentage
-    
+
+def plot_commulative_histogram(
+    column_name: str,
+    df: pd.DataFrame,
+    bins: int,
+    xlim: Optional[tuple[float, float]] = None,
+    dir_save_fig: Optional[str] = None,
+) -> None:
+    """ "Plot histogram of a column with cumulative percentage
+
     Args:
     column_name: str: Name of the column to plot
     df: pd.DataFrame: Dataframe containing the data
@@ -279,9 +298,9 @@ def plot_commulative_histogram(column_name: str,
     """
     _, ax = plt.subplots()
     ax.minorticks_on()
-    
+
     # Get histogram data
-    counts, bins, _ = plt.hist(df[column_name].dropna(), bins=bins, edgecolor='k', alpha=1, color='#FFFFB5')
+    counts, bins, _ = plt.hist(df[column_name].dropna(), bins=bins, edgecolor="k", alpha=1, color="#FFFFB5")
 
     # Compute cumulative percentage
     cumulative_counts = np.cumsum(counts)
@@ -289,17 +308,17 @@ def plot_commulative_histogram(column_name: str,
 
     # Plot cumulative percentage
     ax2 = ax.twinx()
-    ax2.plot(bins[:-1], cumulative_percentage, color='red', marker='.', linestyle='-' ,alpha=0.5)
-    ax2.set_ylabel('Cumulative Percentage (%)', fontsize=12, color='red')
-    ax2.tick_params(axis='y', colors='black')
+    ax2.plot(bins[:-1], cumulative_percentage, color="red", marker=".", linestyle="-", alpha=0.5)
+    ax2.set_ylabel("Cumulative Percentage (%)", fontsize=12, color="red")
+    ax2.tick_params(axis="y", colors="black")
     ax2.set_yticks(np.arange(0, 101, 10))
     ax2.minorticks_on()
 
-    plt.title(f'Cumulative Distribution of {column_name}')
+    plt.title(f"Cumulative Distribution of {column_name}")
     plt.xlabel(column_name, fontsize=12)
-    ax.set_ylabel('Frequency', fontsize=12)
-    ax2.grid(True, which='major', linestyle='-', linewidth=0.5)
-    ax2.set_ylim(0,105)
+    ax.set_ylabel("Frequency", fontsize=12)
+    ax2.grid(True, which="major", linestyle="-", linewidth=0.5)
+    ax2.set_ylim(0, 105)
 
     if xlim:
         xmin, xmax = xlim
@@ -307,5 +326,5 @@ def plot_commulative_histogram(column_name: str,
 
     if dir_save_fig is not None:
         filename = f"{dir_save_fig}/{column_name}_cumulative_histogram.png"
-        plt.savefig(filename, bbox_inches='tight')
+        plt.savefig(filename, bbox_inches="tight")
     plt.show()

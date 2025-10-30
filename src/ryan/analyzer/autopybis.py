@@ -1,23 +1,24 @@
-import pybis
-import pathlib as pl
-import os
-import pandas as pd
-import random
-import string
-import zipfile
-import shutil
 import glob
-from contextlib import contextmanager
-import xml.etree.ElementTree as ET
-from string import Formatter
-from dataclasses import dataclass
-from typing import Generator
-from io import BufferedReader
-import requests
-from typing import Union, Optional, Dict
-import pytz
-from datetime import datetime
+import os
+import pathlib as pl
+import random
+import shutil
+import string
 import traceback
+import xml.etree.ElementTree as ET
+import zipfile
+from contextlib import contextmanager
+from dataclasses import dataclass
+from datetime import datetime
+from io import BufferedReader
+from string import Formatter
+from typing import Dict, Generator, Optional, Union
+
+import pandas as pd
+import pybis
+import pytz
+import requests
+
 
 # This class aids filling for space, project and experimental code for PyBis login.
 class Identifiers:
@@ -181,7 +182,7 @@ def dataset_upload(folder_name, space_code, project_code, ob):
     exp.p["$name"] = folder_name
     exp.save()
 
-    #Upload png image file to OpenBis server.
+    # Upload png image file to OpenBis server.
     png_path = os.path.join("Graph_Export", f"datagram_{folder_name}.GCdata.png")
     thumbnail = pl.Path(png_path)
     test_eln_filling(thumbnail, ob, exp=ident.experiment_identifier)
@@ -220,7 +221,7 @@ def dataset_upload(folder_name, space_code, project_code, ob):
     for idx in range(0, len(df_metadata["Value"])):
         if not pd.isna(df_metadata["OpenBis code"][idx]) and not pd.isna(df_metadata["Value"][idx]):
             try:
-                if df_metadata["Type"][idx] == 'Float':
+                if df_metadata["Type"][idx] == "Float":
                     value = float(df_metadata["Value"][idx])
                 else:
                     value = df_metadata["Value"][idx]
@@ -229,8 +230,15 @@ def dataset_upload(folder_name, space_code, project_code, ob):
             except Exception as e:
                 print("                                ")
                 print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-                print("Error at idx: ", str(idx), "OpenBis code: ", df_metadata["OpenBis code"][idx], "Value: ", df_metadata["Value"][idx])
-                print(f'Exception: {e}')
+                print(
+                    "Error at idx: ",
+                    str(idx),
+                    "OpenBis code: ",
+                    df_metadata["OpenBis code"][idx],
+                    "Value: ",
+                    df_metadata["Value"][idx],
+                )
+                print(f"Exception: {e}")
                 print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
                 print("                                ")
     # Extract and upload the experiment start/end date.
@@ -248,10 +256,10 @@ def dataset_upload(folder_name, space_code, project_code, ob):
 
     try:
         # Create the zip archive
-        shutil.make_archive(zip_file_path[:-4], 'zip', dir_data_folder)
-        
+        shutil.make_archive(zip_file_path[:-4], "zip", dir_data_folder)
+
         ds_all_data = Dataset(ob)
-        ds_all_data.type = "ECHEM6_DATASET" 
+        ds_all_data.type = "ECHEM6_DATASET"
         ds_all_data.data = zip_file_path
         ds_all_data.upload()
 
@@ -263,7 +271,6 @@ def dataset_upload(folder_name, space_code, project_code, ob):
         if os.path.exists(zip_file_path):
             os.remove(zip_file_path)
             print(f"Deleted zip file: {zip_file_path}")
-
 
     # # Uploading datagram
     # try:

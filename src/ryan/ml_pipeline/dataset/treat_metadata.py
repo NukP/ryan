@@ -1,7 +1,8 @@
 """This moduel contains functions that will be used with custom_columns.process_feature() These fuctions will be used
 specifically for treating metadata."""
-from . import main
+
 from . import auxiliary as aux
+from . import main
 
 
 def cathode_catlyst_name(data_package: main.DataPackage) -> str:
@@ -41,7 +42,9 @@ def cathode_gas_mix(data_package: main.DataPackage) -> str:
 
 def cathode_set_ph(data_package: main.DataPackage) -> float:
     """Return Set pH inside cathode compartment."""
-    return aux.get_metadata_cell_value(column_name="Cathode compartment electrolyte pH - SET", data_package=data_package)
+    return aux.get_metadata_cell_value(
+        column_name="Cathode compartment electrolyte pH - SET", data_package=data_package
+    )
 
 
 def cathodic_chloride_conc(data_package: main.DataPackage) -> float:
@@ -177,7 +180,8 @@ def cathodic_gas_co_molfrac(data_package: main.DataPackage) -> float:
 def cathode_over_layer_bool(data_package: main.DataPackage) -> bool:
     """Return whether or not an overlayer is present on the cathode."""
     cat_overlayer = aux.get_metadata_cell_value(
-        column_name="Cathode overlayer components [chemical formula, particle size in µm, concentration in mg/L]", data_package=data_package
+        column_name="Cathode overlayer components [chemical formula, particle size in µm, concentration in mg/L]",
+        data_package=data_package,
     )
     if cat_overlayer == "None":
         return False
@@ -188,7 +192,8 @@ def cathode_over_layer_bool(data_package: main.DataPackage) -> bool:
 def cathode_substrate_chemical_formula(data_package: main.DataPackage) -> str:
     """Return the chemical formula of the cathode substrate."""
     cathode_psuedo_list = aux.get_metadata_cell_value(
-        column_name="Cathode microporous layer components [chemical formula, pore size in µm, thickness in µm]", data_package=data_package
+        column_name="Cathode microporous layer components [chemical formula, pore size in µm, thickness in µm]",
+        data_package=data_package,
     )
     return cathode_psuedo_list.split(",")[0].split("[")[1]
 
@@ -196,6 +201,7 @@ def cathode_substrate_chemical_formula(data_package: main.DataPackage) -> str:
 def cathode_substrate_pore_size(data_package: main.DataPackage) -> float:
     "Return pore size of the cathode substrate in μm"
     cathode_psuedo_list = aux.get_metadata_cell_value(
-        column_name="Cathode microporous layer components [chemical formula, pore size in µm, thickness in µm]", data_package=data_package
+        column_name="Cathode microporous layer components [chemical formula, pore size in µm, thickness in µm]",
+        data_package=data_package,
     )
     return float(cathode_psuedo_list.split(",")[1])

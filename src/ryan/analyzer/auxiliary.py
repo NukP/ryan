@@ -1,17 +1,20 @@
 """
 This module contains auxiliary functions for that helps managing files such as clearing directories and copying files.
 """
+
+import json
 import os
 import shutil
-from typing import Dict, List
-from .slicer import single, multiplex
 import zipfile
-import json
 from collections import Counter
+from typing import Dict, List
+
+from .slicer import multiplex, single
+
 
 def clear_dir(output_dir: str) -> None:
     """
-    Removes all directories in the specified output directory, 
+    Removes all directories in the specified output directory,
     except those named '.gitignore'.
 
     Args:
@@ -22,54 +25,52 @@ def clear_dir(output_dir: str) -> None:
     """
     for item in os.listdir(output_dir):
         item_path = os.path.join(output_dir, item)
-        if os.path.isdir(item_path) and item != '.gitignore':
+        if os.path.isdir(item_path) and item != ".gitignore":
             shutil.rmtree(item_path)
 
 
-def data_slicer(base_dir: str = 'Data/', show_error: bool = False) -> None:
+def data_slicer(base_dir: str = "Data/", show_error: bool = False) -> None:
     """
     Processes the data folders for yadg/dgpost status, printing the results for each unit.
-    
+
     Args:
         base_dir (str, optional): The base directory containing data folders. Defaults to 'Data/'.
         show_error (bool, optional): Flag to indicate whether errors from single.stage_manager and multiplex.stage_manager
         should be shown or not. Defaults to False.
-    
+
     Returns:
         None
     """
-    print('Data slicing or preparation for yadg,dgpost status: \n')
-    
-    dirs = [d for d in os.listdir(base_dir) if d != '.DS_Store' and d != 'holder.gitignore']
-    
+    print("Data slicing or preparation for yadg,dgpost status: \n")
+
+    dirs = [d for d in os.listdir(base_dir) if d != ".DS_Store" and d != "holder.gitignore"]
+
     for file in sorted(dirs):
-        print('------------------------------------------------------------------')
-        print('Folder: ', file)
+        print("------------------------------------------------------------------")
+        print("Folder: ", file)
         folder_path = os.path.join(base_dir, file)
-        
-        if file.startswith('Multiplex'):
+
+        if file.startswith("Multiplex"):
             status_report = multiplex.stage_manager(folder_path, folder_name=file, show_error=show_error)
         else:
             status_report = single.stage_manager(folder_path, folder_name=file, show_error=show_error)
-        
+
         for unit, status in status_report.items():
-            print(f'Successfully sliced: {", ".join(status["pass"])}')
-            
+            print(f"Successfully sliced: {', '.join(status['pass'])}")
+
             if status["failed"]:
-                print(f'Failed to slice: {", ".join(status["failed"])}')
+                print(f"Failed to slice: {', '.join(status['failed'])}")
 
-            if status['proceed']:
-                print(f'{unit} will be subjected to yadg/dgpost')
+            if status["proceed"]:
+                print(f"{unit} will be subjected to yadg/dgpost")
             else:
-                print(f'!! WARNING: {unit} will NOT be subjected to yadg/dgpost')
+                print(f"!! WARNING: {unit} will NOT be subjected to yadg/dgpost")
             print()
-        
-        print('------------------------------------------------------------------')
+
+        print("------------------------------------------------------------------")
 
 
-def update_gc_zip_annotation(
-    data_folder_dir: str, annotation_name: str, sequence_location: str
-) -> None:
+def update_gc_zip_annotation(data_folder_dir: str, annotation_name: str, sequence_location: str) -> None:
     """
     Update annotations in a zip file ending with "-GC.zip" within a given directory.
 
@@ -104,7 +105,7 @@ def update_gc_zip_annotation(
         os.makedirs(temp_dir)
 
         # Step 3: Unzip the file
-        with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+        with zipfile.ZipFile(zip_file_path, "r") as zip_ref:
             zip_ref.extractall(temp_dir)
 
         # Step 4: Update the annotations in all .fusion-data files
@@ -112,7 +113,7 @@ def update_gc_zip_annotation(
             for file in files:
                 if file.endswith(".fusion-data"):
                     file_path = os.path.join(root, file)
-                    with open(file_path, 'r', encoding='utf-8') as f:
+                    with open(file_path, "r", encoding="utf-8") as f:
                         data = json.load(f)
 
                     # Update the "name" field in "annotations"
@@ -124,11 +125,11 @@ def update_gc_zip_annotation(
                         data["sequence"]["location"] = sequence_location
 
                     # Save the updated content back to the file
-                    with open(file_path, 'w', encoding='utf-8') as f:
+                    with open(file_path, "w", encoding="utf-8") as f:
                         json.dump(data, f, indent=4)
 
         # Step 5: Rezip the content back and overwrite the original zip file
-        with zipfile.ZipFile(zip_file_path, 'w', zipfile.ZIP_DEFLATED) as zip_ref:
+        with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED) as zip_ref:
             for root, _, files in os.walk(temp_dir):
                 for file in files:
                     file_path = os.path.join(root, file)
@@ -176,7 +177,7 @@ def analyze_annotations(data_folder_dir: str) -> None:
 
     # Step 3: Analyze the contents of the zip file
     try:
-        with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+        with zipfile.ZipFile(zip_file_path, "r") as zip_ref:
             for file_name in zip_ref.namelist():
                 # Only process .fusion-data files
                 if file_name.endswith(".fusion-data"):
@@ -184,7 +185,7 @@ def analyze_annotations(data_folder_dir: str) -> None:
                         try:
                             # Load JSON and extract fields
                             data = json.load(file)
-                            
+
                             # Count occurrences of "annotations:name"
                             if "annotations" in data and isinstance(data["annotations"], dict):
                                 name = data["annotations"].get("name", "No name field found")
@@ -198,7 +199,7 @@ def analyze_annotations(data_folder_dir: str) -> None:
                         except json.JSONDecodeError:
                             # Skip files that are not valid JSON
                             print(f"File {file_name} is not a valid JSON format.")
-    
+
     except Exception as e:
         print(f"An error occurred: {e}")
         return

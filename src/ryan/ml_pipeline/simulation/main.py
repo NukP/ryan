@@ -1,11 +1,12 @@
-import pandas as pd
-from typing import List, Tuple, Any, Union, Dict
-from dataclasses import dataclass
-from . import gen_functions as gen
-import os
 import logging
+import os
 import time
+from dataclasses import dataclass
+from typing import Any, Dict, List, Tuple, Union
 
+import pandas as pd
+
+from . import gen_functions as gen
 
 # Defaul column name list, used by generate_dataframe function.
 default_ls_column_names = [
@@ -55,7 +56,11 @@ class DataPackage:
 
 
 def simulate(
-    global_time: float, current: float, path_df: Union[str, pd.DataFrame] = None, export_excel: bool = False, cutoff_current: float = -1
+    global_time: float,
+    current: float,
+    path_df: Union[str, pd.DataFrame] = None,
+    export_excel: bool = False,
+    cutoff_current: float = -1,
 ) -> pd.DataFrame:
     """
     Calculate the input features for the model from the input time (global_time) and current.
@@ -85,7 +90,9 @@ def simulate(
         raise ValueError("export_excel must be a boolean value.")
     if export_excel is True:
         if not df.empty and df["global_time"].iloc[-1] >= global_time:
-            raise ValueError("Invalid time value. The global time must be greater than the last global time in the DataFrame.")
+            raise ValueError(
+                "Invalid time value. The global time must be greater than the last global time in the DataFrame."
+            )
 
     dict_for_concat: Dict[str, Any] = {}
     dict_for_concat.update({"global_time": global_time})
@@ -165,18 +172,18 @@ def run_sim_exp(
         else:
             delta_product_produced = 0
 
-        cumulative_product = delta_product_produced if not results else results[-1]["cumulative_product"] + delta_product_produced
+        cumulative_product = (
+            delta_product_produced if not results else results[-1]["cumulative_product"] + delta_product_produced
+        )
 
         # Append results as a dictionary
-        results.append(
-            {
-                "global_t": t,
-                "current": i,
-                "fe": fe,
-                "delta_product_produced": delta_product_produced,
-                "cumulative_product": cumulative_product,
-            }
-        )
+        results.append({
+            "global_t": t,
+            "current": i,
+            "fe": fe,
+            "delta_product_produced": delta_product_produced,
+            "cumulative_product": cumulative_product,
+        })
 
     # Convert list of dictionaries to DataFrame
     df_sim_exp = pd.DataFrame(results)
@@ -185,7 +192,10 @@ def run_sim_exp(
 
 
 def training_manager(
-    dir_saving: str, electrochemical_protocol: List[Tuple[float, float]], export_excel: bool = False, **kwargs_for_sun_sim_exp: Any
+    dir_saving: str,
+    electrochemical_protocol: List[Tuple[float, float]],
+    export_excel: bool = False,
+    **kwargs_for_sun_sim_exp: Any,
 ) -> float:
     """
     This function will take the tuple representing the electrochemical protocol (time, current) and return the total

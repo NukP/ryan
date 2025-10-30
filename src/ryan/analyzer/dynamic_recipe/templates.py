@@ -1,7 +1,7 @@
-""""
+""" "
 This module contains the templates for the dynamically generated recipes for yadg and dgpost.
 """
-  
+
 template_yadg = """metadata:
     provenance:
         type: manual

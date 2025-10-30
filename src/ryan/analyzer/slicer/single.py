@@ -1,15 +1,16 @@
 # Slice and prepare files (data from a single run experiment) for yadg and dgpost
-import os
-import glob
-import pandas as pd
 import datetime
-from datetime import datetime, timedelta
-import time
-import pytz
-import zipfile
+import glob
 import json
+import os
 import shutil
+import time
 import traceback
+import zipfile
+from datetime import datetime, timedelta
+
+import pandas as pd
+import pytz
 
 
 def stage_manager(folder_path, folder_name, show_error=False):
@@ -120,13 +121,11 @@ def praser_pressure(folder_path):
         new_file_path = os.path.join(folder_path, new_file_name)
         timestamps = pressure_df["Time [s]"] + start_time_unix
 
-        new_df = pd.DataFrame(
-            {
-                "": timestamps,
-                "Gas(Read)[mbar]": pressure_df[f"{reactor_name}Gas(Read)[mbar]"],
-                "Liquid(Read)[mbar]": pressure_df[f"{reactor_name}Liquid(Read)[mbar]"],
-            }
-        )
+        new_df = pd.DataFrame({
+            "": timestamps,
+            "Gas(Read)[mbar]": pressure_df[f"{reactor_name}Gas(Read)[mbar]"],
+            "Liquid(Read)[mbar]": pressure_df[f"{reactor_name}Liquid(Read)[mbar]"],
+        })
 
     new_df.to_csv(os.path.join(folder_path, "pressure_for_yadg.csv"), index=False)
 
@@ -149,7 +148,9 @@ def drycal_convert(filepath):
 
     # Convert time data to seconds
     time_in_sec = df["Time"].apply(lambda t: datetime.strptime(t, "%I:%M:%S %p").time())
-    time_in_sec = time_in_sec.apply(lambda t: timedelta(hours=t.hour, minutes=t.minute, seconds=t.second).total_seconds())
+    time_in_sec = time_in_sec.apply(
+        lambda t: timedelta(hours=t.hour, minutes=t.minute, seconds=t.second).total_seconds()
+    )
 
     # Add UTC timestamp to new DataFrame
     new_df["Time"] = date.timestamp() + time_in_sec
@@ -221,7 +222,8 @@ def filter_data_custom(df, gc_sampling_times, removal_window=120, collecting_win
     # For each gc sampling time, update the mask to include the desired data.
     for gc_time in gc_sampling_times:
         mask = mask | (
-            (df["Unix timestamp"] > gc_time + removal_window) & (df["Unix timestamp"] < gc_time + removal_window + collecting_window)
+            (df["Unix timestamp"] > gc_time + removal_window)
+            & (df["Unix timestamp"] < gc_time + removal_window + collecting_window)
         )
     # Apply the mask to the dataframe to filter rows
     new_df = df[mask]
@@ -241,18 +243,21 @@ def flow_adjust(df_flow):
     df_flow_adj = pd.DataFrame({"Unix timestamp": [], "Flow": []})
     for idx in range(0, len(df_flow)):
         if df_flow["Unit of pressure"][idx] == "mBar":
-            df_append = pd.DataFrame({"Unix timestamp": [df_flow["Unix timestamp"][idx]], "Flow": [df_flow["Flow"][idx]]})
+            df_append = pd.DataFrame({
+                "Unix timestamp": [df_flow["Unix timestamp"][idx]],
+                "Flow": [df_flow["Flow"][idx]],
+            })
         elif df_flow["Unit of pressure"][idx] == "kPa":
-            df_append = pd.DataFrame(
-                {
-                    "Unix timestamp": [df_flow["Unix timestamp"][idx]],
-                    "Flow": [
-                        get_Vstd(
-                            Vm=df_flow["Flow"][idx], Pm=df_flow["Measured flow pressure"][idx], Tm=df_flow["Measured flow temperature"][idx]
-                        )
-                    ],
-                }
-            )
+            df_append = pd.DataFrame({
+                "Unix timestamp": [df_flow["Unix timestamp"][idx]],
+                "Flow": [
+                    get_Vstd(
+                        Vm=df_flow["Flow"][idx],
+                        Pm=df_flow["Measured flow pressure"][idx],
+                        Tm=df_flow["Measured flow temperature"][idx],
+                    )
+                ],
+            })
         df_flow_adj = pd.concat([df_flow_adj, df_append], ignore_index=True)
     return df_flow_adj
 

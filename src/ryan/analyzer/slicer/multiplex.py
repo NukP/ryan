@@ -1,18 +1,18 @@
-import os
-import re
-import pandas as pd
-import zipfile
 import glob
 import json
-import pytz
-from datetime import datetime
-import time
+import os
+import re
 import shutil
+import time
 import traceback
+import zipfile
+from datetime import datetime
+
+import pandas as pd
+import pytz
 
 
 def stage_manager(folder_path, folder_name, show_error=False):
-
     if show_error == True:
         try:
             move_gc_files(folder_path)
@@ -182,7 +182,9 @@ def praser_temp(folder_path):
             df_temp.insert(0, "", raw_temp["Unnamed: 0"])
             df_temp.insert(1, "Cell temperature (C)", raw_temp[f"Unit {unit_num} Last (C)"])
             df_temp.insert(2, "Room temperature (C)", raw_temp["RT-external Last (C)"])
-            df_temp.to_csv(os.path.join(folder_path, f"U{unit_num}", f"U{unit_num}_temperature_for_yadg.csv"), index=False)
+            df_temp.to_csv(
+                os.path.join(folder_path, f"U{unit_num}", f"U{unit_num}_temperature_for_yadg.csv"), index=False
+            )
         except:
             pass
 
@@ -221,7 +223,8 @@ def filter_data(df, gc_sampling_times, removal_window=120, collecting_window=340
     # For each gc sampling time, update the mask to include the desired data.
     for gc_time in gc_sampling_times:
         mask = mask | (
-            (df["Unix timestamp"] > gc_time + removal_window) & (df["Unix timestamp"] < gc_time + removal_window + collecting_window)
+            (df["Unix timestamp"] > gc_time + removal_window)
+            & (df["Unix timestamp"] < gc_time + removal_window + collecting_window)
         )
     # Apply the mask to the dataframe to filter rows
     new_df = df[mask]
@@ -240,18 +243,21 @@ def flow_adjust(df_flow):
     df_flow_adj = pd.DataFrame({"Unix timestamp": [], "Flow": []})
     for idx in range(0, len(df_flow)):
         if df_flow["Unit of pressure"][idx] == "mBar":
-            df_append = pd.DataFrame({"Unix timestamp": [df_flow["Unix timestamp"][idx]], "Flow": [df_flow["Flow"][idx]]})
+            df_append = pd.DataFrame({
+                "Unix timestamp": [df_flow["Unix timestamp"][idx]],
+                "Flow": [df_flow["Flow"][idx]],
+            })
         elif df_flow["Unit of pressure"][idx] == "kPa":
-            df_append = pd.DataFrame(
-                {
-                    "Unix timestamp": [df_flow["Unix timestamp"][idx]],
-                    "Flow": [
-                        get_Vstd(
-                            Vm=df_flow["Flow"][idx], Pm=df_flow["Measured flow pressure"][idx], Tm=df_flow["Measured flow temperature"][idx]
-                        )
-                    ],
-                }
-            )
+            df_append = pd.DataFrame({
+                "Unix timestamp": [df_flow["Unix timestamp"][idx]],
+                "Flow": [
+                    get_Vstd(
+                        Vm=df_flow["Flow"][idx],
+                        Pm=df_flow["Measured flow pressure"][idx],
+                        Tm=df_flow["Measured flow temperature"][idx],
+                    )
+                ],
+            })
         df_flow_adj = pd.concat([df_flow_adj, df_append], ignore_index=True)
     return df_flow_adj
 

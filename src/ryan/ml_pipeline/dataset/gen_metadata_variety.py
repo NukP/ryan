@@ -5,8 +5,10 @@ files.
 This Excel file will be used to generate a Sankey flow diagram. For now, this module will be mainly used with ML31
 workbook.
 """
-import pandas as pd
+
 import os
+
+import pandas as pd
 from ml_co2.dataset.cleaning import utility as util
 
 
@@ -39,7 +41,9 @@ def extract_metadata(
             if idecies_from_pseudolist is None:
                 metadata_value = util.get_value_from_excel(metadata, column_name_in_metadata_file)
             else:
-                psuedo_list = util.process_pseudo_list(util.get_value_from_excel(metadata, column_name_in_metadata_file))
+                psuedo_list = util.process_pseudo_list(
+                    util.get_value_from_excel(metadata, column_name_in_metadata_file)
+                )
                 metadata_value = util.get_element_from_pseudolist(psuedo_list, idecies_from_pseudolist)
             if enforce_type_float:
                 ls.append(float(metadata_value))
@@ -54,7 +58,9 @@ def get_cathode_catalyst_comp(list_metadata: list):
     ls = []
     for metadata in list_metadata:
         try:
-            returned_string = util.get_value_from_excel(metadata, "Cathode catalyst components [chemical formula, mol fraction]")
+            returned_string = util.get_value_from_excel(
+                metadata, "Cathode catalyst components [chemical formula, mol fraction]"
+            )
         except:
             print(metadata)
             raise (f"There is an error with the file {metadata}")  # type: ignore

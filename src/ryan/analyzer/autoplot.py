@@ -1,10 +1,12 @@
-from matplotlib import pyplot as plt
+import glob
+import os
+import traceback
+from typing import Optional
+
 import pandas as pd
 from matplotlib import gridspec
-import os
-import glob
-from typing import Optional
-import traceback
+from matplotlib import pyplot as plt
+
 
 # Auxilary functions
 def hue(name: str) -> str:
@@ -211,21 +213,22 @@ def make_graphLC(path_LC: str, fig: Optional[str] = None, dpi: Optional[int] = N
     plt.close(fig_LC)
 
 
-def make_graphGC(path: str,
-                fig: Optional[str] = None,
-                dpi: Optional[int] = None,
-                y_label_shift:float = -0.085,
-                ytick_label_size:float = 11,
-                xtick_label_size:float = 11,
-                yaxis_label_size:float = 11
+def make_graphGC(
+    path: str,
+    fig: Optional[str] = None,
+    dpi: Optional[int] = None,
+    y_label_shift: float = -0.085,
+    ytick_label_size: float = 11,
+    xtick_label_size: float = 11,
+    yaxis_label_size: float = 11,
 ) -> None:
     """
     Plot the result of the experiment with Gas Chromatography (GC) data.
 
     Args:
         path (str): The path of the output file (in Excel format).
-        fig (Optional[str], optional): If set to None, the graph will only be displayed and not saved. 
-                                       If a file name is provided, the graph will be saved with that name. 
+        fig (Optional[str], optional): If set to None, the graph will only be displayed and not saved.
+                                       If a file name is provided, the graph will be saved with that name.
                                        Defaults to None.
         dpi (Optional[int], optional): The dpi of the output graph should it be exported. Defaults to None.
         y_label_shift (float, optional): Controlling the shift of the ylabel. Defaults to -0.085.
@@ -238,20 +241,23 @@ def make_graphGC(path: str,
     """
     directory = os.path.dirname(path)
     try:
-        electrochem_file = os.path.join(directory, [file for file in os.listdir(directory) if file.endswith('.electro.xlsx')][0])
+        electrochem_file = os.path.join(
+            directory, [file for file in os.listdir(directory) if file.endswith(".electro.xlsx")][0]
+        )
     except:
         raise ValueError("No electrochem file found in the directory")
-    df_electrochem = pd.read_excel(electrochem_file, skiprows=[1], engine='openpyxl')
-    df_electrochem.columns = ['utx_timestamp'] + df_electrochem.columns[1:].tolist()
+    df_electrochem = pd.read_excel(electrochem_file, skiprows=[1], engine="openpyxl")
+    df_electrochem.columns = ["utx_timestamp"] + df_electrochem.columns[1:].tolist()
     try:
-        metadata_file = os.path.join(directory, [file for file in os.listdir(directory) if file.endswith('-metadata.xlsx')][0])
+        metadata_file = os.path.join(
+            directory, [file for file in os.listdir(directory) if file.endswith("-metadata.xlsx")][0]
+        )
     except:
         raise ValueError("No metadata file found in the directory")
-    df_metadata = pd.read_excel(metadata_file, sheet_name='Metadata')
-    
-    dir_flow_file = glob.glob(os.path.join(directory, '*flow_for_yadg.csv'))[0]
+    df_metadata = pd.read_excel(metadata_file, sheet_name="Metadata")
+
+    dir_flow_file = glob.glob(os.path.join(directory, "*flow_for_yadg.csv"))[0]
     df_flow_raw = pd.read_csv(dir_flow_file)
-    
 
     df_raw = pd.read_excel(path)  # Make a raw df from the GC file.
     # Generating df for plotting
@@ -273,36 +279,44 @@ def make_graphGC(path: str,
     try:
         df_param.insert(len(df_param.columns), "Pgas", df_raw["P_gas [mbar]"][2:].reset_index(drop=True))
         df_param.insert(len(df_param.columns), "Pliquid", df_raw["P_liquid [mbar]"][2:].reset_index(drop=True))
-        dir_pressure_file = glob.glob(os.path.join(directory, '*pressure_for_yadg.csv'))[0]
+        dir_pressure_file = glob.glob(os.path.join(directory, "*pressure_for_yadg.csv"))[0]
         df_pressure_raw = pd.read_csv(dir_pressure_file)
         P_data = True
     except:
         P_data = False
     try:
         df_param.insert(len(df_param.columns), "T_am", df_raw["T_ambient [°C]"][2:].reset_index(drop=True))
-        df_temp_file = glob.glob(os.path.join(directory, '*temperature_for_yadg.csv'))[0]
+        df_temp_file = glob.glob(os.path.join(directory, "*temperature_for_yadg.csv"))[0]
         df_temp_raw = pd.read_csv(df_temp_file)
     except:
         pass
 
     # Setiing xlim for the graph
-    tmin = df_param["time"].min()/60
-    tmax = df_param["time"].max()/60
+    tmin = df_param["time"].min() / 60
+    tmax = df_param["time"].max() / 60
     xmin = round(tmin - 0.05 * (tmax - tmin))
     xmax = round(tmax + 0.05 * (tmax - tmin))
 
     start_time = df_raw["Unnamed: 0"].iloc[2]
 
-    plt.rcParams['ytick.labelsize'] = ytick_label_size  # Y-axis tick labels
-    plt.rcParams['xtick.labelsize'] = xtick_label_size  # X-axis tick labels
-    plt.rcParams['axes.labelsize'] = yaxis_label_size  # Y-axis labels
+    plt.rcParams["ytick.labelsize"] = ytick_label_size  # Y-axis tick labels
+    plt.rcParams["xtick.labelsize"] = xtick_label_size  # X-axis tick labels
+    plt.rcParams["axes.labelsize"] = yaxis_label_size  # Y-axis labels
 
     # Extracting metadata
-    electrolyte_ph = float(df_metadata[df_metadata['Metadata'] == 'Cathode compartment electrolyte pH - SET']['Value'].values[0])
-    catholyte_volume = df_metadata[df_metadata['Metadata'] == 'Cathode compartment electrolyte volume']['Value'].values[0]
-    catodic_electrolyte = df_metadata[df_metadata['Metadata'] == 'Cathode electrolyte compartment solute content [name, concentration in M]']['Value'].values[0]
-    anolyte_volume = df_metadata[df_metadata['Metadata'] == 'Anode compartment electrolyte volume']['Value'].values[0]
-    anodic_electrolyte = df_metadata[df_metadata['Metadata'] == 'Anode electrolyte compartment solute content [name, concentration in M]']['Value'].values[0]
+    electrolyte_ph = float(
+        df_metadata[df_metadata["Metadata"] == "Cathode compartment electrolyte pH - SET"]["Value"].values[0]
+    )
+    catholyte_volume = df_metadata[df_metadata["Metadata"] == "Cathode compartment electrolyte volume"]["Value"].values[
+        0
+    ]
+    catodic_electrolyte = df_metadata[
+        df_metadata["Metadata"] == "Cathode electrolyte compartment solute content [name, concentration in M]"
+    ]["Value"].values[0]
+    anolyte_volume = df_metadata[df_metadata["Metadata"] == "Anode compartment electrolyte volume"]["Value"].values[0]
+    anodic_electrolyte = df_metadata[
+        df_metadata["Metadata"] == "Anode electrolyte compartment solute content [name, concentration in M]"
+    ]["Value"].values[0]
 
     # Generate df containf Faradaic efficiency from the GC.
     df_feGC = gen_df_feGC(df_raw)
@@ -311,64 +325,101 @@ def make_graphGC(path: str,
     ls_major_product = ["H2", "C2H4", "CO", "CH4", "EtOH"]  # Input the chemical name of the major product here.
     ls_remove = ls_major_product + ["time", "Overall", "CO2", "utx"]
     ls_minor_product = [x for x in ls_chemical if x not in ls_remove]
-    
+
     # Plotting
     # Controlling the overall size of the plot,
     fig_GC = plt.figure()
-    
+
     # Draw vertical line for legend adjustment
     # fig_GC.canvas.draw()
     # #line_position = 0.065  # For yaxis label calibration
     # line_position = 0.918  # For label calibration
     # line = plt.Line2D([line_position, line_position], [0, 1], transform=fig_GC.transFigure, color="red", linewidth=1, linestyle="-")
     # fig_GC.add_artist(line)
-    
-    
+
     try:
         filename = os.path.basename(path)
-        title = filename.split(".xlsx")[0].split("datagram_")[-1].split(".GCdata")[0] 
+        title = filename.split(".xlsx")[0].split("datagram_")[-1].split(".GCdata")[0]
     except:
         filename = os.path.basename(path)
-        title = filename.split(".xlsx")[0] 
+        title = filename.split(".xlsx")[0]
     fig_GC.suptitle(title, fontsize=12)
     fig_GC.subplots_adjust(top=0.95)
-    r_exp = 0.75 # Ratio for the experimental data
-    r0 = 1.3 # Ratio for the other graphs that are not FE plot
-    r1 = 3 # ratio for the FE plot
+    r_exp = 0.75  # Ratio for the experimental data
+    r0 = 1.3  # Ratio for the other graphs that are not FE plot
+    r1 = 3  # ratio for the FE plot
     if P_data is False:
         fig_GC.set_figheight(17)
         fig_GC.set_figwidth(8)
-        spec = gridspec.GridSpec(ncols=1, nrows=8, width_ratios=[1], hspace=0.3, height_ratios=[r_exp, r0, r0, r0, r0, r0, r1, r1])
+        spec = gridspec.GridSpec(
+            ncols=1, nrows=8, width_ratios=[1], hspace=0.3, height_ratios=[r_exp, r0, r0, r0, r0, r0, r1, r1]
+        )
     elif P_data is True:
         fig_GC.set_figheight(19)
         fig_GC.set_figwidth(8)
-        spec = gridspec.GridSpec(ncols=1, nrows=9, width_ratios=[1], hspace=0.3, height_ratios=[r_exp, r0, r0, r0, r0, r0, r0, r1, r1])
+        spec = gridspec.GridSpec(
+            ncols=1, nrows=9, width_ratios=[1], hspace=0.3, height_ratios=[r_exp, r0, r0, r0, r0, r0, r0, r1, r1]
+        )
 
     graph_position = 0
     # Text box for metadata
     ax_exp = fig_GC.add_subplot(spec[graph_position])
-    ax_exp.axis('off')
-    textstr = '\n'.join((
-    f'Cathode pH = {electrolyte_ph:.2f}',
-    f'Cathode volume = {catholyte_volume} mL',
-    f'Cathode solute content [salt, molar concentration] = {catodic_electrolyte}',
-    f'Anode volume = {anolyte_volume} mL',
-    f'Anode solute content [salt, molar concentration] = {anodic_electrolyte}'
-))
-    props = dict(boxstyle='round', facecolor='wheat', alpha=0.8)
-    ax_exp.text(0.15, 1.3, textstr, transform=ax_exp.transAxes, fontsize=10,
-            verticalalignment='top', bbox=props, linespacing=1.5)
+    ax_exp.axis("off")
+    textstr = "\n".join((
+        f"Cathode pH = {electrolyte_ph:.2f}",
+        f"Cathode volume = {catholyte_volume} mL",
+        f"Cathode solute content [salt, molar concentration] = {catodic_electrolyte}",
+        f"Anode volume = {anolyte_volume} mL",
+        f"Anode solute content [salt, molar concentration] = {anodic_electrolyte}",
+    ))
+    props = dict(boxstyle="round", facecolor="wheat", alpha=0.8)
+    ax_exp.text(
+        0.15,
+        1.3,
+        textstr,
+        transform=ax_exp.transAxes,
+        fontsize=10,
+        verticalalignment="top",
+        bbox=props,
+        linespacing=1.5,
+    )
     graph_position += 1
-
 
     # Potential
     ax_eapp = fig_GC.add_subplot(spec[graph_position])
     ax_eapp.minorticks_on()
     ax_eapp.tick_params(which="both", direction="in")
-    ax_eapp.scatter(df_param["time"] / 60, df_param["Eapp"], color="orangered", marker="o", alpha=0.8, label = "E$_{app}$ - Interpolated data")
-    ax_eapp.scatter(df_param["time"] / 60, df_param["Eref"], color="royalblue", marker="o", alpha=0.8, label = "E$_{ref}$ - Interpolated data")
-    ax_eapp.scatter(df_param["time"] / 60, df_param["Ewe"], color="darkorange", marker="o", alpha=0.8, label = "E$_{WE}$ - Interpolated data")
-    ax_eapp.plot((df_electrochem["utx_timestamp"]-start_time) / 60, df_electrochem["Ewe [V]"], color="orange", alpha=0.5, label = "E$_{WE}$ - Raw data")
+    ax_eapp.scatter(
+        df_param["time"] / 60,
+        df_param["Eapp"],
+        color="orangered",
+        marker="o",
+        alpha=0.8,
+        label="E$_{app}$ - Interpolated data",
+    )
+    ax_eapp.scatter(
+        df_param["time"] / 60,
+        df_param["Eref"],
+        color="royalblue",
+        marker="o",
+        alpha=0.8,
+        label="E$_{ref}$ - Interpolated data",
+    )
+    ax_eapp.scatter(
+        df_param["time"] / 60,
+        df_param["Ewe"],
+        color="darkorange",
+        marker="o",
+        alpha=0.8,
+        label="E$_{WE}$ - Interpolated data",
+    )
+    ax_eapp.plot(
+        (df_electrochem["utx_timestamp"] - start_time) / 60,
+        df_electrochem["Ewe [V]"],
+        color="orange",
+        alpha=0.5,
+        label="E$_{WE}$ - Raw data",
+    )
     ax_eapp.set_ylabel("Potential (V)")
     ax_eapp.yaxis.set_label_coords(y_label_shift, 0.5)
     ax_eapp.set_xlim(xmin, xmax)
@@ -379,8 +430,16 @@ def make_graphGC(path: str,
     ax_i = fig_GC.add_subplot(spec[graph_position])
     ax_i.minorticks_on()
     ax_i.tick_params(which="both", direction="in")
-    ax_i.scatter(df_param["time"] / 60, df_param["I"], color="darkorange", marker="o", alpha=0.8, label = "Interpolated data")
-    ax_i.plot((df_electrochem["utx_timestamp"]-start_time) / 60, df_electrochem["I [mA]"], color="orange", alpha=0.8, label = "Raw data")
+    ax_i.scatter(
+        df_param["time"] / 60, df_param["I"], color="darkorange", marker="o", alpha=0.8, label="Interpolated data"
+    )
+    ax_i.plot(
+        (df_electrochem["utx_timestamp"] - start_time) / 60,
+        df_electrochem["I [mA]"],
+        color="orange",
+        alpha=0.8,
+        label="Raw data",
+    )
     ax_i.set_ylabel("I (mA)")
     ax_i.yaxis.set_label_coords(y_label_shift, 0.5)
     ax_i.set_xlim(xmin, xmax)
@@ -394,20 +453,48 @@ def make_graphGC(path: str,
     ax_temp.set_ylabel("T (°C)")
     ax_temp.yaxis.set_label_coords(y_label_shift, 0.5)
     if df_param["T"].std() == 0:
-        ax_temp.plot(df_param["time"] / 60, df_param["T"], color="red", marker="o", alpha=0.8, label="Default temperature")
+        ax_temp.plot(
+            df_param["time"] / 60, df_param["T"], color="red", marker="o", alpha=0.8, label="Default temperature"
+        )
         ax_temp.legend(loc="upper right")
         ax_temp.legend(loc="upper right", bbox_to_anchor=(1.345, 1.06))
     elif df_param["T"].std() != 0:
-        ax_temp.scatter(df_param["time"] / 60, df_param["T"], color="darkorange", marker="o", alpha=0.8, label="Cell temparature - Interpolated data")
-        ax_temp.plot((df_temp_raw.iloc[:,0]-start_time)/60, df_temp_raw['Cell temperature (C)'], color="darkorange", alpha=0.8, label="Cell temperature - Raw data")
+        ax_temp.scatter(
+            df_param["time"] / 60,
+            df_param["T"],
+            color="darkorange",
+            marker="o",
+            alpha=0.8,
+            label="Cell temparature - Interpolated data",
+        )
+        ax_temp.plot(
+            (df_temp_raw.iloc[:, 0] - start_time) / 60,
+            df_temp_raw["Cell temperature (C)"],
+            color="darkorange",
+            alpha=0.8,
+            label="Cell temperature - Raw data",
+        )
         ax_temp.legend(loc="upper right", bbox_to_anchor=(1.525, 1.06))
     try:
-        ax_temp.scatter(df_param["time"] / 60, df_param["T_am"], color="royalblue", marker="o", alpha=0.8, label="Room temparature - Interpolated data")
-        ax_temp.plot((df_temp_raw.iloc[:,0]-start_time)/60, df_temp_raw['Room temperature (C)'], color="royalblue", alpha=0.8, label="Room temperature - Raw data")
+        ax_temp.scatter(
+            df_param["time"] / 60,
+            df_param["T_am"],
+            color="royalblue",
+            marker="o",
+            alpha=0.8,
+            label="Room temparature - Interpolated data",
+        )
+        ax_temp.plot(
+            (df_temp_raw.iloc[:, 0] - start_time) / 60,
+            df_temp_raw["Room temperature (C)"],
+            color="royalblue",
+            alpha=0.8,
+            label="Room temperature - Raw data",
+        )
     except:
         pass
     ax_temp.set_xlim(xmin, xmax)
-    
+
     graph_position += 1
 
     # Flow
@@ -416,11 +503,31 @@ def make_graphGC(path: str,
     ax_flow.tick_params(which="both", direction="in")
     ax_flow.set_xlim(xmin, xmax)
     try:
-        ax_flow.scatter(df_param["time"] / 60, df_param["fout"], color="darkorange", marker="o", alpha=0.8, label="f$_{out}$ - Interpolated data")
-        
+        ax_flow.scatter(
+            df_param["time"] / 60,
+            df_param["fout"],
+            color="darkorange",
+            marker="o",
+            alpha=0.8,
+            label="f$_{out}$ - Interpolated data",
+        )
+
     except:
-        ax_flow.scatter(df_param["time"] / 60, df_param["fout_ml"], color="darkorange", marker="o", alpha=0.8, label="f$_{out}$ - Interpolated data")
-    ax_flow.plot((df_flow_raw.iloc[:,0]-start_time)/60, df_flow_raw['Flow (nml per min)'], color="darkorange", alpha=0.8, label="f$_{out}$ - Raw data")    
+        ax_flow.scatter(
+            df_param["time"] / 60,
+            df_param["fout_ml"],
+            color="darkorange",
+            marker="o",
+            alpha=0.8,
+            label="f$_{out}$ - Interpolated data",
+        )
+    ax_flow.plot(
+        (df_flow_raw.iloc[:, 0] - start_time) / 60,
+        df_flow_raw["Flow (nml per min)"],
+        color="darkorange",
+        alpha=0.8,
+        label="f$_{out}$ - Raw data",
+    )
     ax_flow.set_ylabel("f$_{out}$ (mL/min)")
     ax_flow.yaxis.set_label_coords(y_label_shift, 0.5)
     ax_flow.legend(loc="upper right", bbox_to_anchor=(1.367, 1.06))
@@ -441,10 +548,36 @@ def make_graphGC(path: str,
         ax_p = fig_GC.add_subplot(spec[graph_position])
         ax_p.minorticks_on()
         ax_p.tick_params(which="both", direction="in")
-        ax_p.scatter(df_param["time"] / 60, df_param["Pgas"], color="orangered", marker="o", alpha=0.8, label="P$_{gas}$ - Interpolated data")
-        ax_p.plot((df_pressure_raw.iloc[:,0]-start_time)/60, df_pressure_raw['Gas(Read)[mbar]'], color="orangered", alpha=0.8, label="P$_{gas}$ - Raw data")
-        ax_p.scatter(df_param["time"] / 60, df_param["Pliquid"], color="royalblue", marker="o", alpha=0.8, label="P$_{liquid}$ - Interpolated data")
-        ax_p.plot((df_pressure_raw.iloc[:,0]-start_time)/60, df_pressure_raw['Liquid(Read)[mbar]'], color="royalblue", alpha=0.5, label="P$_{liquid}$ - Raw data")
+        ax_p.scatter(
+            df_param["time"] / 60,
+            df_param["Pgas"],
+            color="orangered",
+            marker="o",
+            alpha=0.8,
+            label="P$_{gas}$ - Interpolated data",
+        )
+        ax_p.plot(
+            (df_pressure_raw.iloc[:, 0] - start_time) / 60,
+            df_pressure_raw["Gas(Read)[mbar]"],
+            color="orangered",
+            alpha=0.8,
+            label="P$_{gas}$ - Raw data",
+        )
+        ax_p.scatter(
+            df_param["time"] / 60,
+            df_param["Pliquid"],
+            color="royalblue",
+            marker="o",
+            alpha=0.8,
+            label="P$_{liquid}$ - Interpolated data",
+        )
+        ax_p.plot(
+            (df_pressure_raw.iloc[:, 0] - start_time) / 60,
+            df_pressure_raw["Liquid(Read)[mbar]"],
+            color="royalblue",
+            alpha=0.5,
+            label="P$_{liquid}$ - Raw data",
+        )
         ax_p.set_ylabel("Pressure (mbar)")
         ax_p.yaxis.set_label_coords(y_label_shift, 0.5)
         ax_p.legend(loc="upper right", bbox_to_anchor=(1.39, 1.06))
@@ -454,9 +587,8 @@ def make_graphGC(path: str,
     # Faradaic efficiency (From GC) - Major prodcuts
     # The Overall fe include all of the Faradaic efficiency from both major and minor products.
     ax_fe_major = fig_GC.add_subplot(spec[graph_position])
-    ax_fe_major.minorticks_on() 
-    ax_fe_major.tick_params(which='both', direction='in')
-    
+    ax_fe_major.minorticks_on()
+    ax_fe_major.tick_params(which="both", direction="in")
 
     for idx_chemical, chemical_name in enumerate(ls_major_product + ["Overall"]):
         ax_fe_major.plot(
@@ -511,9 +643,14 @@ def make_graphGC(path: str,
     plt.close(fig_GC)
 
 
-
 def dir_make_graph(
-    dir: str = 'Output', type: str = "GC", save_fig: bool = False, format: str = "svg", dpi: int = 300, path_output: str = None, **kwargs
+    dir: str = "Output",
+    type: str = "GC",
+    save_fig: bool = False,
+    format: str = "svg",
+    dpi: int = 300,
+    path_output: str = None,
+    **kwargs,
 ) -> None:
     """
     Plot graphs for files in the given directory.
@@ -560,7 +697,7 @@ def dir_make_graph(
                     make_graphGC(path=file_path, **kwargs)
                 except Exception as e:
                     print("There is an error while trying to plot: " + file_path + ". Please check the input file")
-                    traceback.print_exc() 
+                    traceback.print_exc()
             elif save_fig is True:
                 if path_output is None:
                     if os.path.isdir(os.path.join(dir, "Graph Export")):
@@ -575,7 +712,7 @@ def dir_make_graph(
                     make_graphGC(file_path, fig=fig, dpi=dpi, **kwargs)
                 except Exception as e:
                     print("There is an error while trying to plot: " + file_path + ". Please check the input file")
-                    traceback.print_exc() 
+                    traceback.print_exc()
             else:
                 print("save_fig can only be True or False")
                 return ()

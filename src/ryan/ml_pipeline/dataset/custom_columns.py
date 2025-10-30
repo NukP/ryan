@@ -7,11 +7,14 @@ Args: All of the functions take data_package as an argument. The data_package is
 Returns: All of the function returns:
     new_col_data: Any, - Data for the specific cell.
 """
-from . import auxiliary as aux
-from . import main
+
+from typing import Callable, Tuple, Union
+
 import numpy as np
 import xarray as xr
-from typing import Callable, Tuple, Union
+
+from . import auxiliary as aux
+from . import main
 
 TRESHOLD_CURRENT = -2.5  # in mA. This is the threshold current for which the current is considered negative.
 
@@ -100,7 +103,9 @@ def global_time_positive_i(data_package: main.DataPackage):
     )
     if ls_idx_ipos:
         ls_window_idx_ipos = aux.gen_window_section_idx_list(ls_idx_ipos)
-        total_time_ipos = aux.sum_val_selected_windows(df=df_electro, column_name="Unnamed: 0", ls_sel_windows=ls_window_idx_ipos)
+        total_time_ipos = aux.sum_val_selected_windows(
+            df=df_electro, column_name="Unnamed: 0", ls_sel_windows=ls_window_idx_ipos
+        )
         new_col_data = total_time_ipos
     else:
         new_col_data = 0
@@ -121,7 +126,9 @@ def delta_time_positive_i(data_package: main.DataPackage):
     )
     if ls_idx_ipos:
         ls_window_idx_ipos = aux.gen_window_section_idx_list(ls_idx_ipos)
-        total_time_ipos = aux.sum_val_selected_windows(df=df_electro, column_name="Unnamed: 0", ls_sel_windows=ls_window_idx_ipos)
+        total_time_ipos = aux.sum_val_selected_windows(
+            df=df_electro, column_name="Unnamed: 0", ls_sel_windows=ls_window_idx_ipos
+        )
         new_col_data = total_time_ipos
     else:
         new_col_data = 0
@@ -142,7 +149,9 @@ def global_time_negative_i(data_package: main.DataPackage):
     )
     if ls_idx_ipos:
         ls_window_idx_ipos = aux.gen_window_section_idx_list(ls_idx_ipos)
-        total_time_ipos = aux.sum_val_selected_windows(df=df_electro, column_name="Unnamed: 0", ls_sel_windows=ls_window_idx_ipos)
+        total_time_ipos = aux.sum_val_selected_windows(
+            df=df_electro, column_name="Unnamed: 0", ls_sel_windows=ls_window_idx_ipos
+        )
         new_col_data = total_time_ipos
     else:
         new_col_data = 0
@@ -163,7 +172,9 @@ def delta_time_negative_i(data_package: main.DataPackage):
     )
     if ls_idx_ipos:
         ls_window_idx_ipos = aux.gen_window_section_idx_list(ls_idx_ipos)
-        total_time_ipos = aux.sum_val_selected_windows(df=df_electro, column_name="Unnamed: 0", ls_sel_windows=ls_window_idx_ipos)
+        total_time_ipos = aux.sum_val_selected_windows(
+            df=df_electro, column_name="Unnamed: 0", ls_sel_windows=ls_window_idx_ipos
+        )
         new_col_data = total_time_ipos
     else:
         new_col_data = 0
@@ -217,7 +228,9 @@ def delta_q_pos_i(data_package: main.DataPackage):
     )
     if ls_idx_ipos:
         ls_window_idx_ipos = aux.gen_window_section_idx_list(ls_idx_ipos)
-        total_time_ipos = aux.sum_val_selected_windows(df=df_electro, column_name="Q [A·s]", ls_sel_windows=ls_window_idx_ipos)
+        total_time_ipos = aux.sum_val_selected_windows(
+            df=df_electro, column_name="Q [A·s]", ls_sel_windows=ls_window_idx_ipos
+        )
         new_col_data = total_time_ipos
     else:
         new_col_data = 0
@@ -243,7 +256,9 @@ def global_q_pos_i(data_package: main.DataPackage):
     )
     if ls_idx_ipos:
         ls_window_idx_ipos = aux.gen_window_section_idx_list(ls_idx_ipos)
-        total_time_ipos = aux.sum_val_selected_windows(df=df_electro, column_name="Q [A·s]", ls_sel_windows=ls_window_idx_ipos)
+        total_time_ipos = aux.sum_val_selected_windows(
+            df=df_electro, column_name="Q [A·s]", ls_sel_windows=ls_window_idx_ipos
+        )
         new_col_data = total_time_ipos
     else:
         new_col_data = 0
@@ -269,7 +284,9 @@ def delta_q_neg_i(data_package: main.DataPackage):
     )
     if ls_idx_ipos:
         ls_window_idx_ipos = aux.gen_window_section_idx_list(ls_idx_ipos)
-        total_time_ipos = aux.sum_val_selected_windows(df=df_electro, column_name="Q [A·s]", ls_sel_windows=ls_window_idx_ipos)
+        total_time_ipos = aux.sum_val_selected_windows(
+            df=df_electro, column_name="Q [A·s]", ls_sel_windows=ls_window_idx_ipos
+        )
         new_col_data = total_time_ipos
     else:
         new_col_data = 0
@@ -295,7 +312,9 @@ def global_q_neg_i(data_package: main.DataPackage):
     )
     if ls_idx_ipos:
         ls_window_idx_ipos = aux.gen_window_section_idx_list(ls_idx_ipos)
-        total_time_ipos = aux.sum_val_selected_windows(df=df_electro, column_name="Q [A·s]", ls_sel_windows=ls_window_idx_ipos)
+        total_time_ipos = aux.sum_val_selected_windows(
+            df=df_electro, column_name="Q [A·s]", ls_sel_windows=ls_window_idx_ipos
+        )
         new_col_data = total_time_ipos
     else:
         new_col_data = 0
@@ -402,7 +421,12 @@ def delta_e_pos_avg(data_package: main.DataPackage):
     """
     df_electro, idx_start, idx_end, _, _ = aux.unpack_data_cc(data_package, "delta")
     ls_idx_ipos = aux.gen_selected_val_list(
-        df=df_electro, target_column="Ewe [V]", idx_start=int(idx_start), idx_end=int(idx_end), mode="positive", treshold_value=TRESHOLD_CURRENT
+        df=df_electro,
+        target_column="Ewe [V]",
+        idx_start=int(idx_start),
+        idx_end=int(idx_end),
+        mode="positive",
+        treshold_value=TRESHOLD_CURRENT,
     )
     if ls_idx_ipos:
         new_col_data = aux.get_avg_selected_val(df=df_electro, column_name="Ewe [V]", ls_windows=ls_idx_ipos)
@@ -421,7 +445,12 @@ def delta_e_neg_avg(data_package: main.DataPackage):
     """
     df_electro, idx_start, idx_end, _, _ = aux.unpack_data_cc(data_package, "delta")
     ls_idx_ipos = aux.gen_selected_val_list(
-        df=df_electro, target_column="Ewe [V]", idx_start=int(idx_start), idx_end=int(idx_end), mode="negative", treshold_value=TRESHOLD_CURRENT
+        df=df_electro,
+        target_column="Ewe [V]",
+        idx_start=int(idx_start),
+        idx_end=int(idx_end),
+        mode="negative",
+        treshold_value=TRESHOLD_CURRENT,
     )
     if ls_idx_ipos:
         new_col_data = aux.get_avg_selected_val(df=df_electro, column_name="Ewe [V]", ls_windows=ls_idx_ipos)
@@ -490,13 +519,17 @@ def dummy_print_dir_nc(data_package: main.DataPackage):
 
 def delta_Eapp_fluctuation(data_package: main.DataPackage):
     """The fluctuation (standard deviation) of the applied potential between the previous GC injection to the current GC injection.
-    
+
     ** Regardless of Ewe or Eapp being used, the value would be the same since the correction for the potential would be the same
     in all of the point in the same experiment. The standard deviation would be the same.
     """
     df_electro, idx_start, idx_end, _, _ = aux.unpack_data_cc(data_package, "delta")
     ls_sel_val = []
-    ls_sel_val = [df_electro["Ewe [V]"][idx] for idx in range(idx_start, idx_end + 1) if not (-1 < df_electro["Ewe [V]"][idx] < -0.5)]
+    ls_sel_val = [
+        df_electro["Ewe [V]"][idx]
+        for idx in range(idx_start, idx_end + 1)
+        if not (-1 < df_electro["Ewe [V]"][idx] < -0.5)
+    ]
     if len(ls_sel_val) < 0:
         new_col_data = np.NaN
     else:

@@ -1,10 +1,11 @@
 """This auxliary module contain functions used in feature engineering of many custom functions in custom_columns
 module."""
-from typing import Tuple, Dict, List, Union
-import pandas as pd
+
 import os
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, List, Tuple, Union
+
+import pandas as pd
 
 # I put this to avoid cyclical import issues.
 if TYPE_CHECKING:
@@ -66,7 +67,7 @@ def get_time_slot(time_slot_option: str, data_package: "DataPackage") -> Tuple[f
 
 
 def process_row(
-    args_tuple: Tuple[bool, int, Dict[str, pd.DataFrame], List[str], List[str], List[str], bool, str, str]
+    args_tuple: Tuple[bool, int, Dict[str, pd.DataFrame], List[str], List[str], List[str], bool, str, str],
 ) -> Dict[str, Union[int, str, float]]:
     """
     A function used for extracting and calculating values for engineered features in main.gen_dataset.
@@ -79,8 +80,8 @@ def process_row(
     Returns:
         Dict[str, Union[int, str, float]]: Dictionary of values for each column for the given index.
     """
-    from .main import DataPackage
     from .custom_columns import process_feature
+    from .main import DataPackage
 
     (
         pass_fl,
@@ -170,7 +171,9 @@ def t_to_idx(df: pd.DataFrame, t: float) -> float:
     return idx_closet
 
 
-def gen_selected_val_list(df: pd.DataFrame, target_column: str, idx_start: int, idx_end: int, mode: str, treshold_value: float) -> list:
+def gen_selected_val_list(
+    df: pd.DataFrame, target_column: str, idx_start: int, idx_end: int, mode: str, treshold_value: float
+) -> list:
     """
     Generates a list of tuples containing the index and the value from a specified column of a DataFrame, filtered based
     on a mode ('positive' or 'negative').
@@ -194,9 +197,17 @@ def gen_selected_val_list(df: pd.DataFrame, target_column: str, idx_start: int, 
     """
     ls_sel_val = []
     if mode == "positive":
-        ls_sel_val = [(idx, df[target_column][idx]) for idx in range(idx_start, idx_end + 1) if df[target_column][idx] > treshold_value]
+        ls_sel_val = [
+            (idx, df[target_column][idx])
+            for idx in range(idx_start, idx_end + 1)
+            if df[target_column][idx] > treshold_value
+        ]
     elif mode == "negative":
-        ls_sel_val = [(idx, df[target_column][idx]) for idx in range(idx_start, idx_end + 1) if df[target_column][idx] < treshold_value]
+        ls_sel_val = [
+            (idx, df[target_column][idx])
+            for idx in range(idx_start, idx_end + 1)
+            if df[target_column][idx] < treshold_value
+        ]
     else:
         raise ValueError('The mode can only either be "positive" or "negative".')
     return ls_sel_val
@@ -429,7 +440,8 @@ def cal_cathode_ions(data_package: "DataPackage") -> dict:
     """
     dict_cathode_ions = {"K+": 0, "Na+": 0, "sulphate": 0, "Cl-": 0, "HCO3-": 0}
     str_cathode_composition = get_metadata_cell_value(
-        column_name="Cathode electrolyte compartment solute content [name, concentration in M]", data_package=data_package
+        column_name="Cathode electrolyte compartment solute content [name, concentration in M]",
+        data_package=data_package,
     )
     dict_cathode_composition = pseudolist_conv(str_cathode_composition)
     if "HCl" in dict_cathode_composition.keys():

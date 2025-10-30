@@ -1,12 +1,14 @@
 import shutil
-import time
-import pandas as pd
 import subprocess
+import time
 from functools import partial
 from multiprocessing import Pool, cpu_count
-from .dynamic_recipe import recifier
-from typing import List
 from pathlib import Path
+from typing import List
+
+import pandas as pd
+
+from .dynamic_recipe import recifier
 
 
 def run_and_stream(cmd: List[str]) -> None:
@@ -23,14 +25,12 @@ def run_and_stream(cmd: List[str]) -> None:
     buf = []
     assert proc.stdout is not None
     for line in proc.stdout:
-        print(line, end="")     # live output in notebook
+        print(line, end="")  # live output in notebook
         buf.append(line)
     proc.wait()
     if proc.returncode != 0:
-        raise subprocess.CalledProcessError(
-            proc.returncode, cmd, output="".join(buf)
-        )
-    
+        raise subprocess.CalledProcessError(proc.returncode, cmd, output="".join(buf))
+
 
 def exclaim_print(word: str, color: str = "yellow") -> None:
     """
@@ -164,7 +164,10 @@ def run_yadg_dgpost(d: Path, show_log: bool = False, manual_recipe: bool = True,
     exclaim_print(f"Start yadg on: {d}")
 
     yadg_cmd = [
-        "yadg", "preset", "-p", "-a",
+        "yadg",
+        "preset",
+        "-p",
+        "-a",
         str(yadg_recipe),
         str(input_path),
         str(output_dir / f"datagram_{d}.nc"),

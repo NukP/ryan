@@ -1,14 +1,18 @@
 import os
-import pandas as pd
+import time
+import warnings
 from dataclasses import dataclass
 from multiprocessing import Pool, cpu_count
-from . import auxiliary as aux
-import time
+
+import pandas as pd
 from tqdm.notebook import tqdm
-import warnings
+
+from . import auxiliary as aux
 
 # add here to suppress the warning from openpyxl
-warnings.filterwarnings("ignore", message="Data Validation extension is not supported and will be removed", module="openpyxl.*")
+warnings.filterwarnings(
+    "ignore", message="Data Validation extension is not supported and will be removed", module="openpyxl.*"
+)
 
 
 @dataclass
@@ -23,13 +27,13 @@ class DataPackage:
     df_electro: pd.DataFrame = None  # type: ignore
     fl_dir: str = None  # type: ignore
     fl_electro_dir: str = None  # type: ignore
-    #dir_datagram: str = None  # type: ignore
+    # dir_datagram: str = None  # type: ignore
 
     def __post_init__(self):
         self.fl_dir = os.path.join(self.dir, self.fln)
         fln_electro = self.fln.split(".")[0] + ".electro.xlsx"
         self.fl_electro_dir = os.path.join(self.dir, fln_electro)
-        #self.dir_datagram = os.path.join(self.dir, self.fln.split(".")[0] + ".nc")
+        # self.dir_datagram = os.path.join(self.dir, self.fln.split(".")[0] + ".nc")
 
 
 def mod_df(fl_excel: str) -> pd.DataFrame:
@@ -218,7 +222,7 @@ def gen_dataset(
     print("Start loading associated Excel files process.")
     with Pool(processes=cpu_count()) as pool:
         args_list = [(fln, gc_excel_dir) for fln in list_fl]
-        for (fln, df) in tqdm(pool.imap_unordered(aux.read_excel, args_list), total=len(args_list)):
+        for fln, df in tqdm(pool.imap_unordered(aux.read_excel, args_list), total=len(args_list)):
             dict_df[fln] = df
     print("Excel loading completed.\n")
     end_time = time.time()

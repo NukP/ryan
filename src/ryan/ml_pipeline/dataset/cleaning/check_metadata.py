@@ -26,13 +26,16 @@ Check list are as follows:
 21. Check the date in the name of the file and the date in the Experiment date entry.
 22. Cathode geometric surface area should be 1 or 0.2 cm².
 """
-import pandas as pd
-from pandas import DataFrame
-from typing import Tuple, Optional
-import numpy as np
+
 import re
 from datetime import datetime
-from .utility import get_value_from_df, convert_to_dict
+from typing import Optional, Tuple
+
+import numpy as np
+import pandas as pd
+from pandas import DataFrame
+
+from .utility import convert_to_dict, get_value_from_df
 
 
 def check_condition_1(df_metadata: pd.DataFrame) -> Tuple[bool, Optional[str]]:
@@ -48,7 +51,9 @@ def check_condition_1(df_metadata: pd.DataFrame) -> Tuple[bool, Optional[str]]:
         Tuple[bool, Optional[str]]: A tuple containing a boolean indicating whether the condition is met
         and an optional string with an error message if the condition is not met.
     """
-    values = get_value_from_df(df_metadata, "Cathode microporous layer components [chemical formula, pore size in µm, thickness in µm]")
+    values = get_value_from_df(
+        df_metadata, "Cathode microporous layer components [chemical formula, pore size in µm, thickness in µm]"
+    )
     dict_cathode = convert_to_dict(values, "chemical_composiiton", "pore_size", "thickness")
     if dict_cathode["chemical_composiiton"] == "PTFE":
         if float(dict_cathode["pore_size"]) == 0.3:
@@ -71,7 +76,9 @@ def check_condition_2(df_metadata: pd.DataFrame) -> Tuple[bool, Optional[str]]:
         Tuple[bool, Optional[str]]: A tuple containing a boolean indicating whether the condition is met
         and an optional string with an error message if the condition is not met.
     """
-    values = get_value_from_df(df_metadata, "Cathode microporous layer components [chemical formula, pore size in µm, thickness in µm]")
+    values = get_value_from_df(
+        df_metadata, "Cathode microporous layer components [chemical formula, pore size in µm, thickness in µm]"
+    )
     dict_cathode = convert_to_dict(values, "chemical_composiiton", "pore_size", "thickness")
     if dict_cathode["chemical_composiiton"] == "PVDF":
         if float(dict_cathode["pore_size"]) == 0.3 or float(dict_cathode["pore_size"]) == 0.8:
@@ -94,10 +101,16 @@ def check_condition_3(df_metadata: pd.DataFrame) -> Tuple[bool, Optional[str]]:
         Tuple[bool, Optional[str]]: A tuple containing a boolean indicating whether the condition is met
         and an optional string with an error message if the condition is not met.
     """
-    values = get_value_from_df(df_metadata, "Cathode microporous layer components [chemical formula, pore size in µm, thickness in µm]")
+    values = get_value_from_df(
+        df_metadata, "Cathode microporous layer components [chemical formula, pore size in µm, thickness in µm]"
+    )
     dict_cathode = convert_to_dict(values, "chemical_composiiton", "pore_size", "thickness")
     if dict_cathode["chemical_composiiton"] == "PVDF-HFP":
-        if float(dict_cathode["pore_size"]) == 0.2 or float(dict_cathode["pore_size"]) == 0.7 or float(dict_cathode["pore_size"]) == 1.1:
+        if (
+            float(dict_cathode["pore_size"]) == 0.2
+            or float(dict_cathode["pore_size"]) == 0.7
+            or float(dict_cathode["pore_size"]) == 1.1
+        ):
             package = (True, None)
         else:
             package = (False, f"Pore size should be 0.2, 0.7 or 1.1 instead it is {dict_cathode['pore_size']}")
@@ -160,7 +173,10 @@ def check_condition_6(df_metadata: pd.DataFrame) -> Tuple[bool, Optional[str]]:
         Tuple[bool, Optional[str]]: A tuple containing a boolean indicating whether the condition is met
         and an optional string with an error message if the condition is not met.
     """
-    if get_value_from_df(df_metadata, "Cathode electrolyte compartment solute content [name, concentration in M]") == "[KHCO3, 1]":
+    if (
+        get_value_from_df(df_metadata, "Cathode electrolyte compartment solute content [name, concentration in M]")
+        == "[KHCO3, 1]"
+    ):
         cathode_pH = float(get_value_from_df(df_metadata, "Cathode compartment electrolyte pH - SET"))
         if cathode_pH == 7.8:
             package = (True, None)
@@ -186,7 +202,9 @@ def check_condition_7(df_metadata: pd.DataFrame):
         Tuple[bool, Optional[str]]: A tuple containing a boolean indicating whether the condition is met
         and an optional string with an error message if the condition is not met.
     """
-    cathode_electrolyte = get_value_from_df(df_metadata, "Cathode electrolyte compartment solute content [name, concentration in M]")
+    cathode_electrolyte = get_value_from_df(
+        df_metadata, "Cathode electrolyte compartment solute content [name, concentration in M]"
+    )
     cathode_pH = float(get_value_from_df(df_metadata, "Cathode compartment electrolyte pH - SET"))
 
     # Initialize the package as True by default
@@ -220,7 +238,9 @@ def check_condition_8(df_metadata: DataFrame) -> Tuple[bool, Optional[str]]:
         Tuple[bool, Optional[str]]: A tuple containing a boolean indicating whether the condition is met
         and an optional string with an error message if the condition is not met.
     """
-    cathode_electrolyte = get_value_from_df(df_metadata, "Cathode electrolyte compartment solute content [name, concentration in M]")
+    cathode_electrolyte = get_value_from_df(
+        df_metadata, "Cathode electrolyte compartment solute content [name, concentration in M]"
+    )
     if "[H2SO4, 1]" in cathode_electrolyte:
         cathode_pH = float(get_value_from_df(df_metadata, "Cathode compartment electrolyte pH - SET"))
         if cathode_pH == 0:
@@ -246,7 +266,9 @@ def check_condition_9(df_metadata: DataFrame) -> Tuple[bool, Optional[str]]:
         Tuple[bool, Optional[str]]: A tuple containing a boolean indicating whether the condition is met
         and an optional string with an error message if the condition is not met.
     """
-    anode_electrolyte = get_value_from_df(df_metadata, "Anode electrolyte compartment solute content [name, concentration in M]")
+    anode_electrolyte = get_value_from_df(
+        df_metadata, "Anode electrolyte compartment solute content [name, concentration in M]"
+    )
     if "[H2SO4, 1]" in anode_electrolyte:
         anode_pH = float(get_value_from_df(df_metadata, "Anode compartment electrolyte pH - SET"))
         if anode_pH == 0:
@@ -272,7 +294,9 @@ def check_condition_10(df_metadata: DataFrame) -> Tuple[bool, Optional[str]]:
         Tuple[bool, Optional[str]]: A tuple containing a boolean indicating whether the condition is met
         and an optional string with an error message if the condition is not met.
     """
-    cathode_electrolyte = get_value_from_df(df_metadata, "Cathode electrolyte compartment solute content [name, concentration in M]")
+    cathode_electrolyte = get_value_from_df(
+        df_metadata, "Cathode electrolyte compartment solute content [name, concentration in M]"
+    )
     if "[H2SO4, 0.1]" in cathode_electrolyte:
         cathode_pH = float(get_value_from_df(df_metadata, "Cathode compartment electrolyte pH - SET"))
         if cathode_pH == 1:
@@ -298,7 +322,9 @@ def check_condition_11(df_metadata: DataFrame) -> Tuple[bool, Optional[str]]:
         Tuple[bool, Optional[str]]: A tuple containing a boolean indicating whether the condition is met
         and an optional string with an error message if the condition is not met.
     """
-    anode_electrolyte = get_value_from_df(df_metadata, "Anode electrolyte compartment solute content [name, concentration in M]")
+    anode_electrolyte = get_value_from_df(
+        df_metadata, "Anode electrolyte compartment solute content [name, concentration in M]"
+    )
     if "[H2SO4, 0.1]" in anode_electrolyte:
         anode_pH = float(get_value_from_df(df_metadata, "Anode compartment electrolyte pH - SET"))
         if anode_pH == 1:
@@ -349,7 +375,9 @@ def check_condition_14(df_metadata: DataFrame):
     """
     anode_cat_name = get_value_from_df(df_metadata, "Anode catalyst name")
     if anode_cat_name == "Commercial IrOx on Ti":
-        anode_cat_component = get_value_from_df(df_metadata, "Anode catalyst components [chemical formula, mol fraction]")
+        anode_cat_component = get_value_from_df(
+            df_metadata, "Anode catalyst components [chemical formula, mol fraction]"
+        )
         anode_cat_loading = str(get_value_from_df(df_metadata, "Anode catalyst loading"))
         anode_sub_component = get_value_from_df(
             df_metadata, "Anode microporous layer components [chemical formula, pore size in µm, thickness in µm]"
@@ -388,7 +416,9 @@ def check_condition_15(df_metadata: DataFrame):
     """
     anode_cat_name = get_value_from_df(df_metadata, "Anode catalyst name")
     if anode_cat_name == "Electrodeposited IrOx on Ti":
-        anode_cat_component = get_value_from_df(df_metadata, "Anode catalyst components [chemical formula, mol fraction]")
+        anode_cat_component = get_value_from_df(
+            df_metadata, "Anode catalyst components [chemical formula, mol fraction]"
+        )
         anode_cat_loading = str(get_value_from_df(df_metadata, "Anode catalyst loading"))
         anode_sub_component = get_value_from_df(
             df_metadata, "Anode microporous layer components [chemical formula, pore size in µm, thickness in µm]"

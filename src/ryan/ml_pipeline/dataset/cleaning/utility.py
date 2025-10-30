@@ -1,17 +1,18 @@
 """This modeule contains utility functions that are used with analyzing data/metadata."""
 
-import os
-import pandas as pd
-from pandas import DataFrame
-from typing import List, Optional
-import shutil
-import zipfile
 import json
+import os
+import shutil
+import tempfile
+import zipfile
 from collections import Counter
 from datetime import datetime
-import tempfile
-from openpyxl import load_workbook
 from pathlib import Path
+from typing import List, Optional
+
+import pandas as pd
+from openpyxl import load_workbook
+from pandas import DataFrame
 from yadg.extractors.fusion import json as fusion_json
 
 
@@ -36,7 +37,9 @@ def load_dataframes(directory: str) -> dict:
         raise ValueError(f"Error loading dataframes: {e}")
 
 
-def get_value_from_df(df: DataFrame, input_row_name: str, input_column: str = "Metadata", output_column_name: str = "Value") -> any:
+def get_value_from_df(
+    df: DataFrame, input_row_name: str, input_column: str = "Metadata", output_column_name: str = "Value"
+) -> any:
     """
     Retrieve a value from a DataFrame based on a specified row and column.
 
@@ -121,7 +124,11 @@ def print_list_variety(values: list) -> None:
 
 
 def get_value_from_excel(
-    excel_path: str, input_row_name: str, input_column: str = "Metadata", output_column_name: str = "Value", sheet_name: str = "Metadata"
+    excel_path: str,
+    input_row_name: str,
+    input_column: str = "Metadata",
+    output_column_name: str = "Value",
+    sheet_name: str = "Metadata",
 ) -> any:
     """
     Retrieve a value from an Excel file based on a specified row and column.
@@ -286,18 +293,24 @@ def check_metadata_availability(folder_dir: str) -> None:
                         if os.path.isdir(sub_folder_path):
                             # Check for metadata files in the sub-folder
                             metadata_files = [
-                                f for f in os.listdir(sub_folder_path) if f.endswith("metadata.xlsx") and not f.startswith("~")
+                                f
+                                for f in os.listdir(sub_folder_path)
+                                if f.endswith("metadata.xlsx") and not f.startswith("~")
                             ]
                             if not metadata_files:
                                 print(f"Folder: {folder_name}, unit: {sub_folder_name} is missing metadata.")
             else:
                 # Handle non-"Multiplex" folders
-                metadata_files = [f for f in os.listdir(folder_path) if f.endswith("metadata.xlsx") and not f.startswith("~")]
+                metadata_files = [
+                    f for f in os.listdir(folder_path) if f.endswith("metadata.xlsx") and not f.startswith("~")
+                ]
                 if not metadata_files:
                     print(f"Folder: {folder_name} is missing metadata.")
 
 
-def push_metadata_files(data_folder: str, metadata_folder: str, verbose: bool = False, show_intend_path: bool = False) -> None:
+def push_metadata_files(
+    data_folder: str, metadata_folder: str, verbose: bool = False, show_intend_path: bool = False
+) -> None:
     """
     Copies metadata files from the metadata folder into the correct directories in the data folder. Handles
     inconsistencies between underscores and hyphens in file and folder names for matching. Dynamically tries adding
@@ -726,7 +739,9 @@ def print_metadata_differences(dir_metadatas):
                 df_metadata = pd.read_excel(os.path.join(dir_metadatas, metadata), sheet_name="Metadata")
 
                 # Find the value corresponding to the current row (row_name)
-                value = df_metadata.loc[df_metadata["Metadata"] == row_name, "Value"].values[0]  # Assuming values are in 'Value' column
+                value = df_metadata.loc[df_metadata["Metadata"] == row_name, "Value"].values[
+                    0
+                ]  # Assuming values are in 'Value' column
 
                 # Normalize the value (except for datetime values, which are already in correct format)
                 normalized_value = normalize_value(value)

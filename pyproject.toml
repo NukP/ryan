@@ -47,7 +47,7 @@ ml_pipeline = [
     "matplotlib",
     "plotly",
     "scikit-learn",
-    "xgboost",
+    "xgboost==2.1.0",
     "shap",
     "pandas",
     "seaborn",

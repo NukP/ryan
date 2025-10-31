@@ -727,6 +727,8 @@ def eval_feature_ablation(
             "delta_drop_r2_std": float(delta_r2.std(ddof=1)) if len(delta_r2) > 1 else 0.0,
             "delta_drop_rmse_mean": float(delta_rmse.mean()),
             "delta_drop_rmse_std": float(delta_rmse.std(ddof=1)) if len(delta_rmse) > 1 else 0.0,
+            "delta_r2_significant?": "✅" if float((-1) * delta_r2.mean()) > float(base_r2_s) else "❌",
+            "delta_rmse_significant?": "✅" if float((-1) * delta_rmse.mean()) > float(base_rmse_s) else "❌",
         }
         rows.append(row)
 
@@ -734,6 +736,8 @@ def eval_feature_ablation(
     # Order columns for readability
     preferred = [
         "delta_drop_r2_mean",
+        "delta_r2_significant?",
+        "delta_rmse_significant?",
         "delta_drop_r2_std",
         "delta_drop_rmse_mean",
         "delta_drop_rmse_std",

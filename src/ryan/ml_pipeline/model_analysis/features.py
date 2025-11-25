@@ -2,7 +2,7 @@
 This module contains feature names for different feature sets.
 
 Currently, this module is compatible with column name from itteration 5.
-Example dataset file: dataset_7June20225_itteration5_CO2only.xlsx.
+Example dataset file: dataset_7June2025_itteration5_CO2only.xlsx.
 """
 
 X_RAW_DATA = ["Eapp (V)", "I (mA)", "R (Ω)", "global_time", "global_Q"]

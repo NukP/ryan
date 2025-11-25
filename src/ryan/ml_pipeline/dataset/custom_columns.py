@@ -189,7 +189,7 @@ def delta_time_posneg_ratio(data_package: main.DataPackage):
     Considering the time scale from the previous GC injection to the current GC injection point.
     """
     if delta_time_negative_i(data_package) == 0:
-        new_col_data = np.NaN
+        new_col_data = np.nan
     else:
         new_col_data = delta_time_positive_i(data_package) / delta_time_negative_i(data_package)
     return new_col_data
@@ -203,7 +203,7 @@ def global_time_posneg_ratio(data_package: main.DataPackage):
     Considering the global time.
     """
     if delta_time_negative_i(data_package) == 0:
-        new_col_data = np.NaN
+        new_col_data = np.nan
     else:
         new_col_data = global_time_positive_i(data_package) / global_time_negative_i(data_package)
     return new_col_data
@@ -330,7 +330,7 @@ def delta_q_posneg_ratio(data_package: main.DataPackage):
     Considering the time scale from the previous GC injection to the current GC injection point.
     """
     if delta_q_neg_i(data_package) == 0:
-        new_col_data = np.NaN
+        new_col_data = np.nan
     else:
         new_col_data = delta_q_pos_i(data_package) / delta_q_neg_i(data_package)
     return new_col_data
@@ -345,7 +345,7 @@ def global_q_posneg_ratio(data_package: main.DataPackage):
     Considering the time since the start of electrochemical measurement start until the current GC injection.
     """
     if global_q_neg_i(data_package) == 0:
-        new_col_data = np.NaN
+        new_col_data = np.nan
     else:
         new_col_data = global_q_pos_i(data_package) / global_q_neg_i(data_package)
     return new_col_data
@@ -405,7 +405,7 @@ def delta_i_posneg_avg_ratio(data_package: main.DataPackage):
     Considering the time scale from the previous GC injection to the current GC injection point.
     """
     if delta_i_neg_avg(data_package) == 0:
-        new_col_data = np.NaN
+        new_col_data = np.nan
     else:
         new_col_data = delta_i_pos_avg(data_package) / delta_i_neg_avg(data_package)
     return new_col_data
@@ -467,7 +467,7 @@ def delta_e_posneg_avg_ratio(data_package: main.DataPackage):
     Considering the time scale from the previous GC injection to the current GC injection point.
     """
     if delta_e_neg_avg(data_package) == 0:
-        new_col_data = np.NaN
+        new_col_data = np.nan
     else:
         new_col_data = delta_e_pos_avg(data_package) / delta_e_neg_avg(data_package)
     return new_col_data
@@ -478,7 +478,7 @@ def delta_r(data_package: main.DataPackage):
     idx = data_package.idx
     df_gc = data_package.df_gc
     if idx == 0:
-        new_col_data = np.NaN
+        new_col_data = np.nan
     else:
         delta_r = df_gc["R [Ω]"][idx] - df_gc["R [Ω]"][idx - 1]
         new_col_data = delta_r
@@ -490,7 +490,7 @@ def delta_flow_out(data_package: main.DataPackage):
     idx = data_package.idx
     df_gc = data_package.df_gc
     if idx == 0:
-        new_col_data = np.NaN
+        new_col_data = np.nan
     else:
         delta_flow_out = df_gc["fout [smL/min]"][idx] - df_gc["fout [smL/min]"][idx - 1]
         new_col_data = delta_flow_out
@@ -502,7 +502,7 @@ def delta_Eapp(data_package: main.DataPackage):
     idx = data_package.idx
     df_gc = data_package.df_gc
     if idx == 0:
-        new_col_data = np.NaN
+        new_col_data = np.nan
     else:
         delta_flow_out = df_gc["Eapp [V]"][idx] - df_gc["Eapp [V]"][idx - 1]
         new_col_data = delta_flow_out
@@ -531,7 +531,7 @@ def delta_Eapp_fluctuation(data_package: main.DataPackage):
         if not (-1 < df_electro["Ewe [V]"][idx] < -0.5)
     ]
     if len(ls_sel_val) < 0:
-        new_col_data = np.NaN
+        new_col_data = np.nan
     else:
         new_col_data = np.std(ls_sel_val)
     return new_col_data

@@ -41,7 +41,7 @@ analysis = [
 
 ml_pipeline = [
     "tqdm",
-    "numpy",
+    "numpy>=2",
     "openpyxl",
     "xarray",
     "matplotlib",

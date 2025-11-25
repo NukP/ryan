@@ -37,8 +37,6 @@ def cross_val_and_plot(
     Returns:
     None
     """
-    # The three gas products
-    y_columns = ["fe-H2", "fe-C2H4", "fe-CH4"]
 
     # Combine numerical and categorical columns into X DataFrame
     X = pd.concat([df_raw[X_numerical], df_raw[X_category].apply(lambda col: col.astype("category"))], axis=1)

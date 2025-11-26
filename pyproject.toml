@@ -53,7 +53,9 @@ ml_pipeline = [
     "seaborn",
     "ipykernel",
     "ipywidgets",
-    "nbformat"
+    "nbformat",
+    "catboost>=1.2.8",
+    "lightgbm>=4.6.0",
 ]
 
 [build-system]

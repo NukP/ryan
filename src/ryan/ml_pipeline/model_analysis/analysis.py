@@ -3,7 +3,7 @@ This module contains function to analyze the model performance.
 """
 
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Mapping, Optional, Tuple, Type, Union
 
 import joblib
 import matplotlib.pyplot as plt
@@ -217,15 +217,32 @@ def cross_val_and_plot(
         residual_fig.show()
 
 
-def make_xgb_pipeline(
+def make_regression_pipeline(
     X_numerical: List[str],
     X_category: List[str],
-    random_state: int = 27,
-    **xgb_params,
+    model_cls: Type[RegressorMixin],
+    default_params: Mapping | None = None,
+    **override_params,
 ) -> Pipeline:
     """
-    Create a Pipeline with preprocessing and XGBRegressor.
+    Create a preprocessing + regression Pipeline for an arbitrary model class.
+
+    Args:
+        X_numerical:
+            List of numerical feature column names.
+        X_category:
+            List of categorical feature column names.
+        model_cls:
+            Regressor class (e.g. XGBRegressor, RandomForestRegressor, MLPRegressor).
+        default_params:
+            Mapping of default hyperparameters for this model.
+        override_params:
+            Extra keyword arguments that override entries in default_params.
+
+    Returns:
+        A scikit-learn Pipeline with preprocessing and the instantiated model.
     """
+    # Preprocessing
     preprocessor = ColumnTransformer(
         transformers=[
             ("num", StandardScaler(), X_numerical),
@@ -233,24 +250,21 @@ def make_xgb_pipeline(
         ]
     )
 
-    base_params = dict(
-        enable_categorical=False,  # we use OneHotEncoder here
-        random_state=random_state,
-        n_estimators=300,
-        learning_rate=0.05,
-        max_depth=6,
-    )
-    base_params.update(xgb_params)
+    # Merge default parameters with overrides
+    params = dict(default_params or {})
+    params.update(override_params)
 
-    model = XGBRegressor(**base_params)
+    # Instantiate model
+    model = model_cls(**params)
 
-    pipe = Pipeline(
+    # Build pipeline
+    pipeline = Pipeline(
         steps=[
             ("preprocess", preprocessor),
             ("model", model),
         ]
     )
-    return pipe
+    return pipeline
 
 
 def plot_correlation_matrix(

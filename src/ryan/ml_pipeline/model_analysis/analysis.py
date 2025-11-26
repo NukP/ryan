@@ -12,6 +12,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import seaborn as sns
 import shap
+from sklearn.base import RegressorMixin, clone
 from sklearn.compose import ColumnTransformer
 from sklearn.metrics import r2_score, root_mean_squared_error
 from sklearn.model_selection import KFold
@@ -23,82 +24,85 @@ from . import features
 
 
 def cross_val_and_plot(
-    X_numerical: list, X_category: list, df_raw: pd.DataFrame, y_columns: list = features.PRODUCTS
+    X_numerical: List[str],
+    X_category: List[str],
+    df_raw: pd.DataFrame,
+    model: RegressorMixin,
+    y_columns: List[str] = features.PRODUCTS,
+    n_splits: int = 10,
+    random_state: int = 27,
 ) -> None:
     """
-    Perform 10-fold cross-validation and plot results
+    Perform K-fold cross-validation using a given model and plot results.
 
-    Parameters:
-    X_numerical (list): List of numerical column names
-    X_category (list): List of categorical column names
-    df_raw (pd.DataFrame): The dataset containing both features and target columns
-    y_columns (list): List of target column names (default: ['fe-H2', 'fe-C2H4', 'fe-CH4'])
+    Args:
+        X_numerical:
+            List of numerical feature column names.
+        X_category:
+            List of categorical feature column names.
+        df_raw:
+            DataFrame containing both feature and target columns.
+        model:
+            Any regressor that follows the scikit-learn interface
+            (has fit and predict). This can be a bare model or a
+            Pipeline with preprocessing.
+        y_columns:
+            List of target column names.
+        n_splits:
+            Number of folds for KFold cross-validation.
+        random_state:
+            Random seed for the KFold splitter.
 
     Returns:
-    None
+        None
     """
+    # Build feature matrix X (do not modify df_raw)
+    feature_columns = X_numerical + X_category
+    X = df_raw[feature_columns].copy()
 
-    # Combine numerical and categorical columns into X DataFrame
-    X = pd.concat([df_raw[X_numerical], df_raw[X_category].apply(lambda col: col.astype("category"))], axis=1)
+    # Cross-validator
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
 
-    # Initialize the scaler for numerical columns
-    scaler = StandardScaler()
+    # Base estimator that will be cloned for folds and final model
+    base_estimator = clone(model)
 
-    # Loop through the products
     for product in y_columns:
         y = df_raw[product]
 
-        # Set up 10-fold cross-validation
-        kf = KFold(n_splits=10, shuffle=True, random_state=27)
+        r2_scores: List[float] = []
+        rmse_scores: List[float] = []
 
-        # Define scoring metrics
-        r2_scores = []
-        rmse_scores = []
-
-        # Perform cross-validation
+        # Cross validation
         for train_index, test_index in kf.split(X):
-            X_train_fold, X_test_fold = X.iloc[train_index], X.iloc[test_index]
-            y_train_fold, y_test_fold = y.iloc[train_index], y.iloc[test_index]
+            X_train_fold = X.iloc[train_index]
+            X_test_fold = X.iloc[test_index]
+            y_train_fold = y.iloc[train_index]
+            y_test_fold = y.iloc[test_index]
 
-            # Scale only the numeric columns
-            X_train_fold_scaled = X_train_fold.copy()
-            X_test_fold_scaled = X_test_fold.copy()
-            X_train_fold_scaled[X_numerical] = scaler.fit_transform(X_train_fold[X_numerical])
-            X_test_fold_scaled[X_numerical] = scaler.transform(X_test_fold[X_numerical])
+            # Fresh clone for this fold
+            fold_model = clone(base_estimator)
+            fold_model.fit(X_train_fold, y_train_fold)
 
-            # Initialize the XGBoost model
-            model = XGBRegressor(enable_categorical=True, random_state=27)
+            y_pred_fold = fold_model.predict(X_test_fold)
 
-            # Train the model on the current fold
-            model.fit(X_train_fold_scaled, y_train_fold)
-
-            # Predict on the test fold
-            y_pred_fold = model.predict(X_test_fold_scaled)
-
-            # Calculate R² and RMSE
             r2_fold = r2_score(y_test_fold, y_pred_fold)
             rmse_fold = root_mean_squared_error(y_test_fold, y_pred_fold)
 
-            # Store the scores
             r2_scores.append(r2_fold)
             rmse_scores.append(rmse_fold)
 
-        # Print the mean and standard deviation of R² and RMSE for each product
+        # Print CV summary
         print(f"R^2 for {product}: Mean = {np.mean(r2_scores):.5f}, Std = {np.std(r2_scores):.5f}")
         print(f"RMSE for {product}: Mean = {np.mean(rmse_scores):.5f}, Std = {np.std(rmse_scores):.5f}")
 
-        # Train the final model on the entire dataset
-        X_scaled = X.copy()
-        X_scaled[X_numerical] = scaler.fit_transform(X[X_numerical])
-        model.fit(X_scaled, y)
+        # Train final model on all data
+        final_model = clone(base_estimator)
+        final_model.fit(X, y)
+        y_pred = final_model.predict(X)
 
-        # Predict on the entire dataset
-        y_pred = model.predict(X_scaled)
-
-        # Plot True vs Predicted Values
+        # ===== True vs Predicted plot =====
         fig = go.Figure()
 
-        # Add scatter plot for true vs predicted values
         fig.add_trace(
             go.Scatter(
                 x=y,
@@ -109,21 +113,21 @@ def cross_val_and_plot(
             )
         )
 
-        # Add line for perfect predictions
+        min_value = min(y.min(), y_pred.min())
         max_value = max(y.max(), y_pred.max())
+
         fig.add_trace(
             go.Scatter(
-                x=[0, max_value],
-                y=[0, max_value],
+                x=[min_value, max_value],
+                y=[min_value, max_value],
                 mode="lines",
                 line=dict(color="black", dash="dash", width=4),
                 name="Perfect Predictions",
             )
         )
 
-        # Customize layout
         fig.update_layout(
-            title=f"True vs Predicted Values for {product} (After 10-Fold Cross-Validation)",
+            title=f"True vs Predicted Values for {product} (K={n_splits} CV)",
             xaxis_title="True (experimental) Faradaic Efficiency",
             yaxis_title="Predicted Faradaic Efficiency",
             legend=dict(x=0.02, y=0.98),
@@ -150,18 +154,15 @@ def cross_val_and_plot(
             ),
         )
 
-        # Add grid
         fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="LightGray")
         fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="LightGray")
 
-        # Show the True vs Predicted plot
         fig.show()
 
-        # Residuals Calculation and Plot
+        # ===== Residual plot =====
         residuals = y_pred - y
         residual_fig = go.Figure()
 
-        # Add scatter plot for residuals
         residual_fig.add_trace(
             go.Scatter(
                 x=y,
@@ -172,7 +173,6 @@ def cross_val_and_plot(
             )
         )
 
-        # Add horizontal line at zero
         residual_fig.add_trace(
             go.Scatter(
                 x=[y.min(), y.max()],
@@ -183,9 +183,8 @@ def cross_val_and_plot(
             )
         )
 
-        # Customize layout for residual plot
         residual_fig.update_layout(
-            title=f"Residual Plot for {product} (After 10-Fold Cross-Validation)",
+            title=f"Residual Plot for {product} (K={n_splits} CV)",
             xaxis_title="True (experimental) Faradaic Efficiency",
             yaxis_title="Residuals (Predicted - True)",
             legend=dict(x=0.02, y=0.98),
@@ -212,12 +211,46 @@ def cross_val_and_plot(
             ),
         )
 
-        # Add grid
         residual_fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="LightGray")
         residual_fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="LightGray")
 
-        # Show the Residual plot
         residual_fig.show()
+
+
+def make_xgb_pipeline(
+    X_numerical: List[str],
+    X_category: List[str],
+    random_state: int = 27,
+    **xgb_params,
+) -> Pipeline:
+    """
+    Create a Pipeline with preprocessing and XGBRegressor.
+    """
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ("num", StandardScaler(), X_numerical),
+            ("cat", OneHotEncoder(handle_unknown="ignore"), X_category),
+        ]
+    )
+
+    base_params = dict(
+        enable_categorical=False,  # we use OneHotEncoder here
+        random_state=random_state,
+        n_estimators=300,
+        learning_rate=0.05,
+        max_depth=6,
+    )
+    base_params.update(xgb_params)
+
+    model = XGBRegressor(**base_params)
+
+    pipe = Pipeline(
+        steps=[
+            ("preprocess", preprocessor),
+            ("model", model),
+        ]
+    )
+    return pipe
 
 
 def plot_correlation_matrix(

@@ -23,6 +23,79 @@ from xgboost import XGBRegressor
 from . import features
 
 
+def run_kfold_cv(
+    X_numerical: List[str],
+    X_category: List[str],
+    df_raw: pd.DataFrame,
+    model: RegressorMixin,
+    target: str,
+    n_splits: int = 10,
+    random_state: int = 27,
+) -> Tuple[float, float, float, float]:
+    """
+    Run K-fold cross-validation for a single target and return summary metrics.
+
+    Args:
+        X_numerical:
+            List of numerical feature column names.
+        X_category:
+            List of categorical feature column names.
+        df_raw:
+            DataFrame containing both feature and target columns.
+        model:
+            Any regressor that follows the scikit-learn interface
+            (has fit and predict). This can be a bare model or a
+            Pipeline with preprocessing.
+        target:
+            Name of the target column to predict.
+        n_splits:
+            Number of folds for KFold cross-validation.
+        random_state:
+            Random seed for the KFold splitter.
+
+    Returns:
+        Tuple containing:
+            r2_mean:
+                Mean R^2 across folds.
+            r2_std:
+                Standard deviation of R^2 across folds.
+            rmse_mean:
+                Mean RMSE across folds.
+            rmse_std:
+                Standard deviation of RMSE across folds.
+    """
+    feature_columns = X_numerical + X_category
+    X = df_raw[feature_columns].copy()
+    y = df_raw[target]
+
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    base_estimator = clone(model)
+
+    r2_scores: List[float] = []
+    rmse_scores: List[float] = []
+
+    for train_index, test_index in kf.split(X):
+        X_train_fold = X.iloc[train_index]
+        X_test_fold = X.iloc[test_index]
+        y_train_fold = y.iloc[train_index]
+        y_test_fold = y.iloc[test_index]
+
+        fold_model = clone(base_estimator)
+        fold_model.fit(X_train_fold, y_train_fold)
+
+        y_pred_fold = fold_model.predict(X_test_fold)
+
+        r2_scores.append(r2_score(y_test_fold, y_pred_fold))
+        rmse_scores.append(root_mean_squared_error(y_test_fold, y_pred_fold))
+
+    r2_mean = float(np.mean(r2_scores))
+    r2_std = float(np.std(r2_scores))
+    rmse_mean = float(np.mean(rmse_scores))
+    rmse_std = float(np.std(rmse_scores))
+
+    return r2_mean, r2_std, rmse_mean, rmse_std
+
+
 def cross_val_and_plot(
     X_numerical: List[str],
     X_category: List[str],
@@ -56,46 +129,29 @@ def cross_val_and_plot(
     Returns:
         None
     """
-    # Build feature matrix X (do not modify df_raw)
+    # Build feature matrix X once (do not modify df_raw)
     feature_columns = X_numerical + X_category
     X = df_raw[feature_columns].copy()
 
-    # Cross-validator
-    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-
-    # Base estimator that will be cloned for folds and final model
     base_estimator = clone(model)
 
     for product in y_columns:
+        # Run CV using the helper
+        r2_mean, r2_std, rmse_mean, rmse_std = run_kfold_cv(
+            X_numerical=X_numerical,
+            X_category=X_category,
+            df_raw=df_raw,
+            model=base_estimator,
+            target=product,
+            n_splits=n_splits,
+            random_state=random_state,
+        )
+
+        print(f"R^2 for {product}: Mean = {r2_mean:.5f}, Std = {r2_std:.5f}")
+        print(f"RMSE for {product}: Mean = {rmse_mean:.5f}, Std = {rmse_std:.5f}")
+
+        # Train final model on all data for this target
         y = df_raw[product]
-
-        r2_scores: List[float] = []
-        rmse_scores: List[float] = []
-
-        # Cross validation
-        for train_index, test_index in kf.split(X):
-            X_train_fold = X.iloc[train_index]
-            X_test_fold = X.iloc[test_index]
-            y_train_fold = y.iloc[train_index]
-            y_test_fold = y.iloc[test_index]
-
-            # Fresh clone for this fold
-            fold_model = clone(base_estimator)
-            fold_model.fit(X_train_fold, y_train_fold)
-
-            y_pred_fold = fold_model.predict(X_test_fold)
-
-            r2_fold = r2_score(y_test_fold, y_pred_fold)
-            rmse_fold = root_mean_squared_error(y_test_fold, y_pred_fold)
-
-            r2_scores.append(r2_fold)
-            rmse_scores.append(rmse_fold)
-
-        # Print CV summary
-        print(f"R^2 for {product}: Mean = {np.mean(r2_scores):.5f}, Std = {np.std(r2_scores):.5f}")
-        print(f"RMSE for {product}: Mean = {np.mean(rmse_scores):.5f}, Std = {np.std(rmse_scores):.5f}")
-
-        # Train final model on all data
         final_model = clone(base_estimator)
         final_model.fit(X, y)
         y_pred = final_model.predict(X)

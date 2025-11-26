@@ -26,7 +26,7 @@ def cross_val_and_plot(
     X_numerical: list, X_category: list, df_raw: pd.DataFrame, y_columns: list = features.PRODUCTS
 ) -> None:
     """
-    Perform 10-fold cross-validation and plot results for 'fe-H2', 'fe-C2H4', and 'fe-CH4'.
+    Perform 10-fold cross-validation and plot results
 
     Parameters:
     X_numerical (list): List of numerical column names

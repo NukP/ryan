@@ -2,9 +2,10 @@
 This module hosts a utility to run validation for ML modles
 """
 
-from typing import List, Mapping, Tuple, Type
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Type
 
 import numpy as np
+import optuna
 import pandas as pd
 from sklearn.base import RegressorMixin, clone
 from sklearn.compose import ColumnTransformer
@@ -135,3 +136,114 @@ def make_regression_pipeline(
         ]
     )
     return pipeline
+
+
+def make_suggest_params_fn(search_space: Dict[str, tuple]):
+    """
+    Turn a simple search-space dict into a Optuna suggest_params_fn(trial).
+
+    Expected patterns:
+        "param": ("int", low, high)
+        "param": ("int_log", low, high)
+        "param": ("float", low, high)
+        "param": ("float_log", low, high)
+        "param": ("categorical", [choices])
+    """
+
+    def _suggest_params(trial: optuna.Trial) -> Dict[str, Any]:
+        params: Dict[str, Any] = {}
+
+        for name, spec in search_space.items():
+            kind = spec[0]
+
+            if kind == "int":
+                _, low, high = spec
+                params[name] = trial.suggest_int(name, low, high)
+
+            elif kind == "int_log":
+                _, low, high = spec
+                params[name] = trial.suggest_int(name, low, high, log=True)
+
+            elif kind == "float":
+                _, low, high = spec
+                params[name] = trial.suggest_float(name, low, high)
+
+            elif kind == "float_log":
+                _, low, high = spec
+                params[name] = trial.suggest_float(name, low, high, log=True)
+
+            elif kind == "categorical":
+                _, choices = spec
+                params[name] = trial.suggest_categorical(name, choices)
+
+            else:
+                raise ValueError(f"Unknown search space type '{kind}' for '{name}'.")
+
+        return params
+
+    return _suggest_params
+
+
+def optimize_regressor_with_optuna(
+    X_numerical: List[str],
+    X_category: List[str],
+    df_raw: pd.DataFrame,
+    target: str,
+    model_cls: Type[RegressorMixin],
+    default_params: Optional[Mapping[str, Any]],
+    suggest_params_fn: Callable[[optuna.Trial], Dict[str, Any]],
+    n_splits: int = 10,
+    random_state: int = 27,
+    n_trials: int = 50,
+    study_name: Optional[str] = None,
+) -> Tuple[optuna.Study, Pipeline]:
+    """
+    Run Optuna Bayesian optimization for a generic regressor and return the best model.
+
+    Objective: maximize mean R^2 from run_kfold_cv.
+    """
+    base_params = dict(default_params or {})
+
+    def objective(trial: optuna.Trial) -> float:
+        suggested_params = suggest_params_fn(trial)
+        model_params = {**base_params, **suggested_params}
+
+        model = make_regression_pipeline(
+            X_numerical=X_numerical,
+            X_category=X_category,
+            model_cls=model_cls,
+            default_params=model_params,
+        )
+
+        r2_mean, r2_std, rmse_mean, rmse_std = run_kfold_cv(
+            X_numerical=X_numerical,
+            X_category=X_category,
+            df_raw=df_raw,
+            model=model,
+            target=target,
+            n_splits=n_splits,
+            random_state=random_state,
+        )
+
+        trial.set_user_attr("r2_std", r2_std)
+        trial.set_user_attr("rmse_mean", rmse_mean)
+        trial.set_user_attr("rmse_std", rmse_std)
+
+        return r2_mean
+
+    study = optuna.create_study(
+        direction="maximize",
+        study_name=study_name,
+    )
+
+    study.optimize(objective, n_trials=n_trials, show_progress_bar=True)
+
+    best_params = {**base_params, **study.best_params}
+    best_pipeline = make_regression_pipeline(
+        X_numerical=X_numerical,
+        X_category=X_category,
+        model_cls=model_cls,
+        default_params=best_params,
+    )
+
+    return study, best_pipeline

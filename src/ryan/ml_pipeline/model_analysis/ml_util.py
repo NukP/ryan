@@ -3,6 +3,9 @@ This module hosts a utility to run validation for ML modles
 """
 
 import json
+import logging
+import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Type
 
@@ -186,17 +189,6 @@ def make_suggest_params_fn(search_space: Dict[str, tuple]):
     return _suggest_params
 
 
-import json
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Type
-
-import optuna
-import pandas as pd
-from sklearn.base import RegressorMixin
-from sklearn.pipeline import Pipeline
-
-
 def optimize_regressor_with_optuna(
     X_numerical: List[str],
     X_category: List[str],
@@ -217,7 +209,7 @@ def optimize_regressor_with_optuna(
         algo = model_cls.__name__
         slug = str(target).strip().replace(" ", "_").replace("/", "_").replace("\\", "_")
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return Path(f"best_params_{algo}_{slug}_{ts}.txt")
+        return Path(f"log_optuna_{algo}_{slug}_{ts}.txt")
 
     def _format_params_with_commas(params: Dict[str, Any]) -> str:
         base = json.dumps(params, indent=4)
@@ -229,8 +221,6 @@ def optimize_regressor_with_optuna(
                 t += ","
             out.append(t)
         return "\n".join(out)
-
-    base_params = dict(default_params or {})
 
     if save_best_params:
         if best_params_filename is None:
@@ -244,15 +234,40 @@ def optimize_regressor_with_optuna(
     else:
         resolved_path = None
 
+    log_file = open(resolved_path, "a", encoding="utf-8") if resolved_path else None
+
+    def _log(text: str):
+        sys.stdout.write(text + "\n")
+        sys.stdout.flush()
+        if log_file:
+            log_file.write(text + "\n")
+            log_file.flush()
+
+    class _OptunaFileHandler(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            msg = self.format(record)
+            _log(msg)
+
+    optuna_handler = None
+    if log_file:
+        optuna_handler = _OptunaFileHandler()
+        optuna_handler.setFormatter(logging.Formatter("%(message)s"))
+        optuna_logger = optuna.logging.get_logger("optuna")
+        optuna_logger.addHandler(optuna_handler)
+
+    base_params = dict(default_params or {})
+
     def _objective(trial: optuna.Trial) -> float:
         suggested = suggest_params_fn(trial)
         model_params = {**base_params, **suggested}
+
         model = make_regression_pipeline(
             X_numerical=X_numerical,
             X_category=X_category,
             model_cls=model_cls,
             default_params=model_params,
         )
+
         r2_mean, r2_std, rmse_mean, rmse_std = run_kfold_cv(
             X_numerical=X_numerical,
             X_category=X_category,
@@ -262,24 +277,40 @@ def optimize_regressor_with_optuna(
             n_splits=n_splits,
             random_state=random_state,
         )
+
         trial.set_user_attr("r2_std", r2_std)
         trial.set_user_attr("rmse_mean", rmse_mean)
         trial.set_user_attr("rmse_std", rmse_std)
+
         return r2_mean
 
-    study = optuna.create_study(direction="maximize", study_name=study_name)
-    study.optimize(_objective, n_trials=n_trials, show_progress_bar=True)
+    try:
+        study = optuna.create_study(direction="maximize", study_name=study_name)
+        study.optimize(_objective, n_trials=n_trials, show_progress_bar=True)
 
-    best_params = {**base_params, **study.best_params}
+        best_params = {**base_params, **study.best_params}
 
-    if print_best_params or save_best_params:
-        formatted = _format_params_with_commas(best_params)
-        if print_best_params:
-            print("\nBest parameters (merged with defaults):")
-            print(formatted)
-        if save_best_params and resolved_path is not None:
-            resolved_path.write_text(formatted, encoding="utf-8")
-            print(f"\nSaved best parameters to: {resolved_path}")
+        if print_best_params or save_best_params:
+            formatted = _format_params_with_commas(best_params)
+
+            _log("\nBest parameters (merged with defaults):")
+            _log(formatted)
+
+            if save_best_params and resolved_path:
+                _log(f"\nSaved best parameters to: {resolved_path}")
+
+            r2_best = study.best_value
+            _log(f"\nBest mean R^2: {r2_best}")
+
+            _log("Best hyperparameters:")
+            for k, v in study.best_params.items():
+                _log(f"  {k}: {v}")
+
+    finally:
+        if optuna_handler is not None:
+            optuna.logging.get_logger("optuna").removeHandler(optuna_handler)
+        if log_file:
+            log_file.close()
 
     best_pipeline = make_regression_pipeline(
         X_numerical=X_numerical,

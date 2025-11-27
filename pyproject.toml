@@ -16,6 +16,9 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
+dependencies = [
+    "pre-commit>=4.5.0",
+]
 
 [project.urls]
 Homepage = "https://NukP.github.io/ryan/"

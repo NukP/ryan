@@ -1,0 +1,137 @@
+"""
+This module hosts a utility to run validation for ML modles
+"""
+
+from typing import List, Mapping, Tuple, Type
+
+import numpy as np
+import pandas as pd
+from sklearn.base import RegressorMixin, clone
+from sklearn.compose import ColumnTransformer
+from sklearn.metrics import r2_score, root_mean_squared_error
+from sklearn.model_selection import KFold
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
+
+def run_kfold_cv(
+    X_numerical: List[str],
+    X_category: List[str],
+    df_raw: pd.DataFrame,
+    model: RegressorMixin,
+    target: str,
+    n_splits: int = 10,
+    random_state: int = 27,
+) -> Tuple[float, float, float, float]:
+    """
+    Run K-fold cross-validation for a single target and return summary metrics.
+
+    Args:
+        X_numerical:
+            List of numerical feature column names.
+        X_category:
+            List of categorical feature column names.
+        df_raw:
+            DataFrame containing both feature and target columns.
+        model:
+            Any regressor that follows the scikit-learn interface
+            (has fit and predict). This can be a bare model or a
+            Pipeline with preprocessing.
+        target:
+            Name of the target column to predict.
+        n_splits:
+            Number of folds for KFold cross-validation.
+        random_state:
+            Random seed for the KFold splitter.
+
+    Returns:
+        Tuple containing:
+            r2_mean:
+                Mean R^2 across folds.
+            r2_std:
+                Standard deviation of R^2 across folds.
+            rmse_mean:
+                Mean RMSE across folds.
+            rmse_std:
+                Standard deviation of RMSE across folds.
+    """
+    feature_columns = X_numerical + X_category
+    X = df_raw[feature_columns].copy()
+    y = df_raw[target]
+
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    base_estimator = clone(model)
+
+    r2_scores: List[float] = []
+    rmse_scores: List[float] = []
+
+    for train_index, test_index in kf.split(X):
+        X_train_fold = X.iloc[train_index]
+        X_test_fold = X.iloc[test_index]
+        y_train_fold = y.iloc[train_index]
+        y_test_fold = y.iloc[test_index]
+
+        fold_model = clone(base_estimator)
+        fold_model.fit(X_train_fold, y_train_fold)
+
+        y_pred_fold = fold_model.predict(X_test_fold)
+
+        r2_scores.append(r2_score(y_test_fold, y_pred_fold))
+        rmse_scores.append(root_mean_squared_error(y_test_fold, y_pred_fold))
+
+    r2_mean = float(np.mean(r2_scores))
+    r2_std = float(np.std(r2_scores))
+    rmse_mean = float(np.mean(rmse_scores))
+    rmse_std = float(np.std(rmse_scores))
+
+    return r2_mean, r2_std, rmse_mean, rmse_std
+
+
+def make_regression_pipeline(
+    X_numerical: List[str],
+    X_category: List[str],
+    model_cls: Type[RegressorMixin],
+    default_params: Mapping | None = None,
+    **override_params,
+) -> Pipeline:
+    """
+    Create a preprocessing + regression Pipeline for an arbitrary model class.
+
+    Args:
+        X_numerical:
+            List of numerical feature column names.
+        X_category:
+            List of categorical feature column names.
+        model_cls:
+            Regressor class (e.g. XGBRegressor, RandomForestRegressor, MLPRegressor).
+        default_params:
+            Mapping of default hyperparameters for this model.
+        override_params:
+            Extra keyword arguments that override entries in default_params.
+
+    Returns:
+        A scikit-learn Pipeline with preprocessing and the instantiated model.
+    """
+    # Preprocessing
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ("num", StandardScaler(), X_numerical),
+            ("cat", OneHotEncoder(handle_unknown="ignore"), X_category),
+        ]
+    )
+
+    # Merge default parameters with overrides
+    params = dict(default_params or {})
+    params.update(override_params)
+
+    # Instantiate model
+    model = model_cls(**params)
+
+    # Build pipeline
+    pipeline = Pipeline(
+        steps=[
+            ("preprocess", preprocessor),
+            ("model", model),
+        ]
+    )
+    return pipeline

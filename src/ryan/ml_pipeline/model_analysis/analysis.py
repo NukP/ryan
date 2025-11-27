@@ -3,7 +3,7 @@ This module contains function to analyze the model performance.
 """
 
 from pathlib import Path
-from typing import Dict, List, Mapping, Optional, Tuple, Type, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import joblib
 import matplotlib.pyplot as plt
@@ -20,80 +20,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from xgboost import XGBRegressor
 
-from . import features
-
-
-def run_kfold_cv(
-    X_numerical: List[str],
-    X_category: List[str],
-    df_raw: pd.DataFrame,
-    model: RegressorMixin,
-    target: str,
-    n_splits: int = 10,
-    random_state: int = 27,
-) -> Tuple[float, float, float, float]:
-    """
-    Run K-fold cross-validation for a single target and return summary metrics.
-
-    Args:
-        X_numerical:
-            List of numerical feature column names.
-        X_category:
-            List of categorical feature column names.
-        df_raw:
-            DataFrame containing both feature and target columns.
-        model:
-            Any regressor that follows the scikit-learn interface
-            (has fit and predict). This can be a bare model or a
-            Pipeline with preprocessing.
-        target:
-            Name of the target column to predict.
-        n_splits:
-            Number of folds for KFold cross-validation.
-        random_state:
-            Random seed for the KFold splitter.
-
-    Returns:
-        Tuple containing:
-            r2_mean:
-                Mean R^2 across folds.
-            r2_std:
-                Standard deviation of R^2 across folds.
-            rmse_mean:
-                Mean RMSE across folds.
-            rmse_std:
-                Standard deviation of RMSE across folds.
-    """
-    feature_columns = X_numerical + X_category
-    X = df_raw[feature_columns].copy()
-    y = df_raw[target]
-
-    kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
-    base_estimator = clone(model)
-
-    r2_scores: List[float] = []
-    rmse_scores: List[float] = []
-
-    for train_index, test_index in kf.split(X):
-        X_train_fold = X.iloc[train_index]
-        X_test_fold = X.iloc[test_index]
-        y_train_fold = y.iloc[train_index]
-        y_test_fold = y.iloc[test_index]
-
-        fold_model = clone(base_estimator)
-        fold_model.fit(X_train_fold, y_train_fold)
-
-        y_pred_fold = fold_model.predict(X_test_fold)
-
-        r2_scores.append(r2_score(y_test_fold, y_pred_fold))
-        rmse_scores.append(root_mean_squared_error(y_test_fold, y_pred_fold))
-
-    r2_mean = float(np.mean(r2_scores))
-    r2_std = float(np.std(r2_scores))
-    rmse_mean = float(np.mean(rmse_scores))
-    rmse_std = float(np.std(rmse_scores))
-
-    return r2_mean, r2_std, rmse_mean, rmse_std
+from . import features, ml_util
 
 
 def cross_val_and_plot(
@@ -137,7 +64,7 @@ def cross_val_and_plot(
 
     for product in y_columns:
         # Run CV using the helper
-        r2_mean, r2_std, rmse_mean, rmse_std = run_kfold_cv(
+        r2_mean, r2_std, rmse_mean, rmse_std = ml_util.run_kfold_cv(
             X_numerical=X_numerical,
             X_category=X_category,
             df_raw=df_raw,
@@ -271,56 +198,6 @@ def cross_val_and_plot(
         residual_fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="LightGray")
 
         residual_fig.show()
-
-
-def make_regression_pipeline(
-    X_numerical: List[str],
-    X_category: List[str],
-    model_cls: Type[RegressorMixin],
-    default_params: Mapping | None = None,
-    **override_params,
-) -> Pipeline:
-    """
-    Create a preprocessing + regression Pipeline for an arbitrary model class.
-
-    Args:
-        X_numerical:
-            List of numerical feature column names.
-        X_category:
-            List of categorical feature column names.
-        model_cls:
-            Regressor class (e.g. XGBRegressor, RandomForestRegressor, MLPRegressor).
-        default_params:
-            Mapping of default hyperparameters for this model.
-        override_params:
-            Extra keyword arguments that override entries in default_params.
-
-    Returns:
-        A scikit-learn Pipeline with preprocessing and the instantiated model.
-    """
-    # Preprocessing
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ("num", StandardScaler(), X_numerical),
-            ("cat", OneHotEncoder(handle_unknown="ignore"), X_category),
-        ]
-    )
-
-    # Merge default parameters with overrides
-    params = dict(default_params or {})
-    params.update(override_params)
-
-    # Instantiate model
-    model = model_cls(**params)
-
-    # Build pipeline
-    pipeline = Pipeline(
-        steps=[
-            ("preprocess", preprocessor),
-            ("model", model),
-        ]
-    )
-    return pipeline
 
 
 def plot_correlation_matrix(

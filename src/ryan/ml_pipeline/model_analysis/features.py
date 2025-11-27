@@ -2,7 +2,7 @@
 This module contains feature names for different feature sets.
 
 Currently, this module is compatible with column name from itteration 5.
-Example dataset file: dataset_7June2025_itteration5_CO2only.xlsx.
+Example dataset file: dataset_co2_only_added_products_25Nov.xlsx. This is in ML44 folder.
 """
 
 X_RAW_DATA = ["Eapp (V)", "I (mA)", "R (Ω)", "global_time", "global_Q"]
@@ -62,6 +62,7 @@ X_ENGINEERED = [
     "delta_e_neg_avg",
     "delta_e_posneg_avg_ratio",
     "delta_r",
+    "delta_Q",
     "delta_Eapp",
     "delta_Eapp_fluctuation",
 ]

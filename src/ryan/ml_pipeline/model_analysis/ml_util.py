@@ -2,6 +2,8 @@
 This module hosts a utility to run validation for ML modles
 """
 
+import json
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Type
 
 import numpy as np
@@ -184,6 +186,17 @@ def make_suggest_params_fn(search_space: Dict[str, tuple]):
     return _suggest_params
 
 
+import json
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Type
+
+import optuna
+import pandas as pd
+from sklearn.base import RegressorMixin
+from sklearn.pipeline import Pipeline
+
+
 def optimize_regressor_with_optuna(
     X_numerical: List[str],
     X_category: List[str],
@@ -196,25 +209,50 @@ def optimize_regressor_with_optuna(
     random_state: int = 27,
     n_trials: int = 50,
     study_name: Optional[str] = None,
+    print_best_params: bool = True,
+    save_best_params: bool = True,
+    best_params_filename: Optional[Path] = None,
 ) -> Tuple[optuna.Study, Pipeline]:
-    """
-    Run Optuna Bayesian optimization for a generic regressor and return the best model.
+    def _generate_default_filename() -> Path:
+        algo = model_cls.__name__
+        slug = str(target).strip().replace(" ", "_").replace("/", "_").replace("\\", "_")
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return Path(f"best_params_{algo}_{slug}_{ts}.txt")
 
-    Objective: maximize mean R^2 from run_kfold_cv.
-    """
+    def _format_params_with_commas(params: Dict[str, Any]) -> str:
+        base = json.dumps(params, indent=4)
+        lines = base.splitlines()
+        out = []
+        for line in lines:
+            t = line.rstrip()
+            if ":" in t and not t.endswith(("{", "[", "}", "]", ",")):
+                t += ","
+            out.append(t)
+        return "\n".join(out)
+
     base_params = dict(default_params or {})
 
-    def objective(trial: optuna.Trial) -> float:
-        suggested_params = suggest_params_fn(trial)
-        model_params = {**base_params, **suggested_params}
+    if save_best_params:
+        if best_params_filename is None:
+            resolved_path = _generate_default_filename()
+        else:
+            resolved_path = (
+                best_params_filename if isinstance(best_params_filename, Path) else Path(best_params_filename)
+            )
+        if resolved_path.exists():
+            raise FileExistsError(f"Refusing to overwrite existing file: {resolved_path}")
+    else:
+        resolved_path = None
 
+    def _objective(trial: optuna.Trial) -> float:
+        suggested = suggest_params_fn(trial)
+        model_params = {**base_params, **suggested}
         model = make_regression_pipeline(
             X_numerical=X_numerical,
             X_category=X_category,
             model_cls=model_cls,
             default_params=model_params,
         )
-
         r2_mean, r2_std, rmse_mean, rmse_std = run_kfold_cv(
             X_numerical=X_numerical,
             X_category=X_category,
@@ -224,21 +262,25 @@ def optimize_regressor_with_optuna(
             n_splits=n_splits,
             random_state=random_state,
         )
-
         trial.set_user_attr("r2_std", r2_std)
         trial.set_user_attr("rmse_mean", rmse_mean)
         trial.set_user_attr("rmse_std", rmse_std)
-
         return r2_mean
 
-    study = optuna.create_study(
-        direction="maximize",
-        study_name=study_name,
-    )
-
-    study.optimize(objective, n_trials=n_trials, show_progress_bar=True)
+    study = optuna.create_study(direction="maximize", study_name=study_name)
+    study.optimize(_objective, n_trials=n_trials, show_progress_bar=True)
 
     best_params = {**base_params, **study.best_params}
+
+    if print_best_params or save_best_params:
+        formatted = _format_params_with_commas(best_params)
+        if print_best_params:
+            print("\nBest parameters (merged with defaults):")
+            print(formatted)
+        if save_best_params and resolved_path is not None:
+            resolved_path.write_text(formatted, encoding="utf-8")
+            print(f"\nSaved best parameters to: {resolved_path}")
+
     best_pipeline = make_regression_pipeline(
         X_numerical=X_numerical,
         X_category=X_category,

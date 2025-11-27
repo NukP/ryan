@@ -62,7 +62,7 @@ X_ENGINEERED = [
     "delta_e_neg_avg",
     "delta_e_posneg_avg_ratio",
     "delta_r",
-    "delta_flow_out",
+    # "delta_flow_out",
     "delta_Eapp",
     "delta_Eapp_fluctuation",
 ]

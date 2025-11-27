@@ -62,12 +62,11 @@ X_ENGINEERED = [
     "delta_e_neg_avg",
     "delta_e_posneg_avg_ratio",
     "delta_r",
-    # "delta_flow_out",
     "delta_Eapp",
     "delta_Eapp_fluctuation",
 ]
 
-PRODUCTS = ["fe-H2", "fe-C2H4", "fe-CH4"]
+PRODUCTS = ["fe-H2", "fe-C2H4", "fe-CH4", "fe-1-propanol", "fe-Acetaldehyde", "fe-EtOH"]
 
 X_ALL_NUMERICAL = X_RAW_DATA + X_ENGINEERED + X_METADATA_NUMERICAL
 

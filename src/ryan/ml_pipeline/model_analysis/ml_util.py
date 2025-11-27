@@ -205,6 +205,45 @@ def optimize_regressor_with_optuna(
     save_best_params: bool = True,
     best_params_filename: Optional[Path] = None,
 ) -> Tuple[optuna.Study, Pipeline]:
+    """
+    Optimize a regression model using Optuna with K-fold cross-validation.
+
+    Args:
+        X_numerical:
+            List of numerical feature column names.
+        X_category:
+            List of categorical feature column names.
+        df_raw:
+            DataFrame containing both feature and target columns.
+        target:
+            Name of the target column for prediction.
+        model_cls:
+            Regressor class to instantiate (e.g. XGBRegressor, RandomForestRegressor).
+        default_params:
+            Mapping containing default hyperparameters for the model.
+        suggest_params_fn:
+            Function that takes an Optuna trial and returns a dict of suggested hyperparameters.
+        n_splits:
+            Number of folds for K-fold cross-validation.
+        random_state:
+            Seed for reproducible CV splits.
+        n_trials:
+            Number of Optuna trials to run.
+        study_name:
+            Optional name for the Optuna study.
+        print_best_params:
+            Whether to print best parameters at the end.
+        save_best_params:
+            Whether to save the best parameters to a file.
+        best_params_filename:
+            Optional filename for storing best parameters.
+
+    Returns:
+        Tuple containing:
+            - The Optuna study object.
+            - The best-performing regression Pipeline instantiated with the best parameters.
+    """
+
     def _generate_default_filename() -> Path:
         algo = model_cls.__name__
         slug = str(target).strip().replace(" ", "_").replace("/", "_").replace("\\", "_")

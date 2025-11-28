@@ -26,6 +26,8 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.svm import SVR
 from xgboost import XGBRegressor
 
+from . import features
+
 
 def run_kfold_cv(
     X_numerical: List[str],
@@ -368,32 +370,48 @@ def optimize_regressor_with_optuna(
     return study, best_pipeline
 
 
-def build_fit_save_pipeline(
+def build_model_pipeline(
     df: pd.DataFrame,
     target_column: str,
-    numerical_columns: List[str],
-    categorical_columns: List[str],
     algo: str,
     best_params: Dict,
     pkl_path: Union[str, Path],
-):
+    numerical_columns: List[str] = features.X_ALL_NUMERICAL,
+    categorical_columns: List[str] = features.X_METADATA_CATEGORICAL,
+) -> Pipeline:
     """
-    Build a preprocessing + regression pipeline, fit it, and save it in one step.
+    Build, fit, and save a regression Pipeline consisting of preprocessing and a selected model.
 
-    - Preprocessing:
-        * StandardScaler for numerical columns
-        * OneHotEncoder for categorical columns
-    - Model selection:
-        * Inline if/elif switch using `algo` and `best_params`
+    The preprocessing step applies:
+        - StandardScaler to numerical features.
+        - OneHotEncoder to categorical features.
+
+    The model step uses the algorithm specified by ``algo``, instantiated with ``best_params``.
+
+    Args:
+        df:
+            DataFrame containing both features and the regression target.
+        target_column:
+            Name of the target column to be predicted.
+        numerical_columns:
+            List of numerical feature column names.
+        categorical_columns:
+            List of categorical feature column names.
+        algo:
+            Name of the regression algorithm to use.
+            Supported values:
+            'random_forest', 'svm', 'mlp', 'xgboost', 'xbg', 'lightgbm', 'catboost'.
+        best_params:
+            Mapping containing hyperparameters selected from the HPO campaign.
+        pkl_path:
+            Destination path for saving the fitted Pipeline as a .pkl file.
 
     Returns:
-        The fitted Pipeline.
+        The fitted sklearn Pipeline object.
     """
-    # Prepare data
     X = df[numerical_columns + categorical_columns]
     y = df[target_column]
 
-    # Choose regressor (your preferred pattern)
     algo = algo.lower()
 
     if algo == "random_forest":
@@ -402,16 +420,15 @@ def build_fit_save_pipeline(
         regressor = SVR(**best_params)
     elif algo == "mlp":
         regressor = MLPRegressor(**best_params)
-    elif algo == "xgboost" or algo == "xbg":
+    elif algo == "xgboost" or algo == "xgb":
         regressor = XGBRegressor(**best_params)
     elif algo == "lightgbm":
         regressor = LGBMRegressor(**best_params)
     elif algo == "catboost":
         regressor = CatBoostRegressor(verbose=0, **best_params)
     else:
-        raise ValueError(f"Unknown algo: {algo}")
+        raise ValueError(f"Unknown algorithm: {algo}")
 
-    # Preprocessing
     preprocessor = ColumnTransformer(
         transformers=[
             ("num", StandardScaler(), numerical_columns),
@@ -419,7 +436,6 @@ def build_fit_save_pipeline(
         ]
     )
 
-    # Build full pipeline
     pipeline = Pipeline(
         steps=[
             ("preprocessor", preprocessor),
@@ -427,10 +443,8 @@ def build_fit_save_pipeline(
         ]
     )
 
-    # Fit
     pipeline.fit(X, y)
 
-    # Save
     pkl_path = Path(pkl_path)
     pkl_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(pipeline, pkl_path)

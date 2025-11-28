@@ -7,17 +7,24 @@ import logging
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Type
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Type, Union
 
+import joblib
 import numpy as np
 import optuna
 import pandas as pd
+from catboost import CatBoostRegressor
+from lightgbm import LGBMRegressor
 from sklearn.base import RegressorMixin, clone
 from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import r2_score, root_mean_squared_error
 from sklearn.model_selection import KFold
+from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.svm import SVR
+from xgboost import XGBRegressor
 
 
 def run_kfold_cv(
@@ -320,3 +327,73 @@ def optimize_regressor_with_optuna(
     )
 
     return study, best_pipeline
+
+
+def build_fit_save_pipeline(
+    df: pd.DataFrame,
+    target_column: str,
+    numerical_columns: List[str],
+    categorical_columns: List[str],
+    algo: str,
+    best_params: Dict,
+    pkl_path: Union[str, Path],
+):
+    """
+    Build a preprocessing + regression pipeline, fit it, and save it in one step.
+
+    - Preprocessing:
+        * StandardScaler for numerical columns
+        * OneHotEncoder for categorical columns
+    - Model selection:
+        * Inline if/elif switch using `algo` and `best_params`
+
+    Returns:
+        The fitted Pipeline.
+    """
+    # Prepare data
+    X = df[numerical_columns + categorical_columns]
+    y = df[target_column]
+
+    # Choose regressor (your preferred pattern)
+    algo = algo.lower()
+
+    if algo == "random_forest":
+        regressor = RandomForestRegressor(**best_params)
+    elif algo == "svm":
+        regressor = SVR(**best_params)
+    elif algo == "mlp":
+        regressor = MLPRegressor(**best_params)
+    elif algo == "xgboost" or algo == "xbg":
+        regressor = XGBRegressor(**best_params)
+    elif algo == "lightgbm":
+        regressor = LGBMRegressor(**best_params)
+    elif algo == "catboost":
+        regressor = CatBoostRegressor(verbose=0, **best_params)
+    else:
+        raise ValueError(f"Unknown algo: {algo}")
+
+    # Preprocessing
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ("num", StandardScaler(), numerical_columns),
+            ("cat", OneHotEncoder(handle_unknown="ignore"), categorical_columns),
+        ]
+    )
+
+    # Build full pipeline
+    pipeline = Pipeline(
+        steps=[
+            ("preprocessor", preprocessor),
+            ("model", regressor),
+        ]
+    )
+
+    # Fit
+    pipeline.fit(X, y)
+
+    # Save
+    pkl_path = Path(pkl_path)
+    pkl_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(pipeline, pkl_path)
+
+    return pipeline

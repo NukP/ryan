@@ -12,8 +12,11 @@ import pandas as pd
 import plotly.graph_objects as go
 import seaborn as sns
 import shap
+from catboost import CatBoostRegressor
+from lightgbm import LGBMRegressor
 from sklearn.base import RegressorMixin, clone
 from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import r2_score, root_mean_squared_error
 from sklearn.model_selection import KFold
 from sklearn.pipeline import Pipeline
@@ -314,70 +317,100 @@ def plot_commulative_histogram(
 
 
 def compute_shap_feature_importance(
-    dir_dataset: Union[Path, str],
+    df_dataset: pd.DataFrame,
     model_object: Union[Path, str],
     ls_numerical_columns: List[str] = features.X_ALL_NUMERICAL,
     ls_categorical_columns: List[str] = features.X_METADATA_CATEGORICAL,
-    dropna: bool = True,
 ) -> pd.DataFrame:
     """
-    Compute SHAP-based feature importance for a trained tree-based model.
+    Compute SHAP based feature importance for a trained regression Pipeline.
+
+    The function loads a fitted sklearn Pipeline from disk, applies its
+    preprocessing to the given dataset, and computes mean absolute SHAP
+    values as a measure of feature importance.
+
+    For tree based final estimators (e.g. XGBRegressor, LGBMRegressor,
+    CatBoostRegressor, RandomForestRegressor), TreeExplainer is used.
+    For other regressors (e.g. SVM, MLP), a model agnostic explainer
+    based on ``model.predict`` is used.
 
     Args:
-        dir_dataset: Path to the Excel dataset file.
-        ls_numerical_column: List of numerical feature column names.
-        categorical_columns: List of categorical feature column names.
-        model_object: Path to a serialized model object (.pkl).
-        target_column: Name to show in the print header (e.g., a product/target label).
-        dropna: If True, drop rows with any NA before processing.
+        df_dataset:
+            DataFrame containing the dataset with all feature columns.
+        model_object:
+            Path to a serialized sklearn Pipeline object (.pkl) that contains
+            both preprocessing (e.g. ColumnTransformer) and the regression model.
+        ls_numerical_columns:
+            List of numerical feature column names.
+        ls_categorical_columns:
+            List of categorical feature column names.
 
     Returns:
-        pd.DataFrame: Feature importance table with columns:
-            ['feature', 'relative_importance',
-             'normalized_relative_importance (%)',
-             'cumulative_importance (%)']
-             Indexed starting from 1 (rank order).
+        DataFrame containing SHAP based feature importance with the columns:
+            - 'feature'
+            - 'relative_importance'
+            - 'normalized_relative_importance (%)'
+            - 'cumulative_importance (%)'
+
+        The index starts at 1 and represents the rank (1 is most important).
     """
-    # Ensure paths
-    dir_dataset = Path(dir_dataset)
-    model_object = Path(model_object)
+    model_path = Path(model_object)
 
-    # Load data (work on a copy to keep original safe)
-    df_raw = pd.read_excel(dir_dataset)
-    df = df_raw.copy()
-    if dropna:
-        df = df.dropna()
+    feature_columns = ls_numerical_columns + ls_categorical_columns
+    df = df_dataset.copy()
+    X = df[feature_columns]
 
-    # Build X: cast categoricals, keep numericals
-    X_num = df[ls_numerical_columns]
-    X_cat = df[ls_categorical_columns].apply(lambda col: col.astype("category"))
-    X = pd.concat([X_num, X_cat], axis=1)
+    pipeline: Pipeline = joblib.load(model_path)
 
-    # Scale numeric columns only
-    scaler = StandardScaler()
-    X_scaled = X.copy()
-    X_scaled[ls_numerical_columns] = scaler.fit_transform(X[ls_numerical_columns])
+    # Expect pipeline structure: [("preprocessor", ...), ("model", ...)]
+    try:
+        preprocessor = pipeline.named_steps["preprocessor"]
+        model = pipeline.named_steps["model"]
+    except (AttributeError, KeyError):
+        # Fallback: treat the loaded object as a generic estimator
+        explainer = shap.Explainer(pipeline.predict, X)
+        shap_result = explainer(X)
+        shap_values = shap_result.values
+        feature_names = list(X.columns)
+    else:
+        # Transform X to the representation the model actually sees
+        X_processed = preprocessor.transform(X)
 
-    # Load model
-    model = joblib.load(model_object)
+        # Feature names after preprocessing (e.g. one hot encoded categories)
+        if hasattr(preprocessor, "get_feature_names_out"):
+            feature_names = list(preprocessor.get_feature_names_out())
+        else:
+            feature_names = [str(i) for i in range(X_processed.shape[1])]
 
-    # SHAP
-    explainer = shap.TreeExplainer(model)
-    shap_values = explainer.shap_values(X_scaled)
+        # Use fast tree-specific explainer when possible
+        if isinstance(
+            model,
+            (
+                XGBRegressor,
+                LGBMRegressor,
+                CatBoostRegressor,
+                RandomForestRegressor,
+            ),
+        ):
+            explainer = shap.TreeExplainer(model)
+            shap_values = explainer.shap_values(X_processed)
+        else:
+            # Generic fallback for non tree models (e.g. SVM, MLP)
+            explainer = shap.Explainer(model.predict, X_processed)
+            shap_result = explainer(X_processed)
+            shap_values = shap_result.values
 
-    # Mean absolute SHAP -> relative importance
     feature_importance = np.abs(shap_values).mean(axis=0)
 
     feature_importance_df = (
         pd.DataFrame({
-            "feature": X_scaled.columns,
+            "feature": feature_names,
             "relative_importance": feature_importance,
         })
         .sort_values(by="relative_importance", ascending=False)
         .reset_index(drop=True)
     )
 
-    # Normalize to percentage and cumulative
     total = feature_importance_df["relative_importance"].sum()
     feature_importance_df["normalized_relative_importance (%)"] = (
         feature_importance_df["relative_importance"] / total * 100.0
@@ -386,7 +419,6 @@ def compute_shap_feature_importance(
         "normalized_relative_importance (%)"
     ].cumsum()
 
-    # Rank index starts from 1
     feature_importance_df.index = feature_importance_df.index + 1
 
     return feature_importance_df

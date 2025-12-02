@@ -30,11 +30,11 @@ from . import features
 
 
 def run_kfold_cv(
-    X_numerical: List[str],
-    X_category: List[str],
     df_raw: pd.DataFrame,
-    model: RegressorMixin,
+    model: Union[RegressorMixin, str, Path],
     target: str,
+    X_numerical: List[str] = features.X_ALL_NUMERICAL,
+    X_category: List[str] = features.X_METADATA_CATEGORICAL,
     n_splits: int = 10,
     random_state: int = 27,
 ) -> Tuple[float, float, float, float]:
@@ -42,10 +42,6 @@ def run_kfold_cv(
     Run K-fold cross-validation for a single target and return summary metrics.
 
     Args:
-        X_numerical:
-            List of numerical feature column names.
-        X_category:
-            List of categorical feature column names.
         df_raw:
             DataFrame containing both feature and target columns.
         model:
@@ -53,7 +49,11 @@ def run_kfold_cv(
             (has fit and predict). This can be a bare model or a
             Pipeline with preprocessing.
         target:
-            Name of the target column to predict.
+            Name of the target column to predict (the product, e.g. fe-H2).
+        X_numerical:
+            List of numerical feature column names.
+        X_category:
+            List of categorical feature column names.
         n_splits:
             Number of folds for KFold cross-validation.
         random_state:
@@ -75,6 +75,13 @@ def run_kfold_cv(
     y = df_raw[target]
 
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+
+    # Support model path input
+    if isinstance(model, (str, Path)):
+        model_path = Path(model)
+        if not model_path.exists():
+            raise FileNotFoundError(f"Model file not found: {model_path}")
+        model = joblib.load(model_path)
     base_estimator = clone(model)
 
     r2_scores: List[float] = []

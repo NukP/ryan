@@ -425,7 +425,7 @@ def build_model_pipeline(
     elif algo == "lightgbm":
         regressor = LGBMRegressor(**best_params)
     elif algo == "catboost":
-        regressor = CatBoostRegressor(verbose=0, **best_params)
+        regressor = CatBoostRegressor(**best_params)
     else:
         raise ValueError(f"Unknown algorithm: {algo}")
 

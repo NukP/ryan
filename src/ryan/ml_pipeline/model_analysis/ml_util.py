@@ -382,7 +382,7 @@ def build_model_pipeline(
     target_column: str,
     algo: str,
     best_params: Dict,
-    pkl_path: Union[str, Path],
+    pkl_path: Union[str, Path] = None,
     numerical_columns: List[str] = features.X_ALL_NUMERICAL,
     categorical_columns: List[str] = features.X_METADATA_CATEGORICAL,
 ) -> Pipeline:
@@ -452,8 +452,9 @@ def build_model_pipeline(
 
     pipeline.fit(X, y)
 
-    pkl_path = Path(pkl_path)
-    pkl_path.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(pipeline, pkl_path)
+    if pkl_path:
+        pkl_path = Path(pkl_path)
+        pkl_path.parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump(pipeline, pkl_path)
 
     return pipeline

@@ -421,7 +421,7 @@ def build_model_pipeline(
 
     algo = algo.lower()
 
-    if algo == "random_forest":
+    if algo == "random_forest" or algo == "rf":
         regressor = RandomForestRegressor(**best_params)
     elif algo == "svm":
         regressor = SVR(**best_params)
@@ -429,7 +429,7 @@ def build_model_pipeline(
         regressor = MLPRegressor(**best_params)
     elif algo == "xgboost" or algo == "xgb":
         regressor = XGBRegressor(**best_params)
-    elif algo == "lightgbm":
+    elif algo == "lightgbm" or algo == "lightGBM":
         regressor = LGBMRegressor(**best_params)
     elif algo == "catboost":
         regressor = CatBoostRegressor(**best_params)

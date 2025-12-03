@@ -30,11 +30,11 @@ from . import features
 
 
 def run_kfold_cv(
-    X_numerical: List[str],
-    X_category: List[str],
     df_raw: pd.DataFrame,
-    model: RegressorMixin,
+    model: Union[RegressorMixin, str, Path],
     target: str,
+    X_numerical: List[str] = features.X_ALL_NUMERICAL,
+    X_category: List[str] = features.X_METADATA_CATEGORICAL,
     n_splits: int = 10,
     random_state: int = 27,
 ) -> Tuple[float, float, float, float]:
@@ -42,10 +42,6 @@ def run_kfold_cv(
     Run K-fold cross-validation for a single target and return summary metrics.
 
     Args:
-        X_numerical:
-            List of numerical feature column names.
-        X_category:
-            List of categorical feature column names.
         df_raw:
             DataFrame containing both feature and target columns.
         model:
@@ -53,7 +49,11 @@ def run_kfold_cv(
             (has fit and predict). This can be a bare model or a
             Pipeline with preprocessing.
         target:
-            Name of the target column to predict.
+            Name of the target column to predict (the product, e.g. fe-H2).
+        X_numerical:
+            List of numerical feature column names.
+        X_category:
+            List of categorical feature column names.
         n_splits:
             Number of folds for KFold cross-validation.
         random_state:
@@ -75,6 +75,13 @@ def run_kfold_cv(
     y = df_raw[target]
 
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+
+    # Support model path input
+    if isinstance(model, (str, Path)):
+        model_path = Path(model)
+        if not model_path.exists():
+            raise FileNotFoundError(f"Model file not found: {model_path}")
+        model = joblib.load(model_path)
     base_estimator = clone(model)
 
     r2_scores: List[float] = []
@@ -375,7 +382,7 @@ def build_model_pipeline(
     target_column: str,
     algo: str,
     best_params: Dict,
-    pkl_path: Union[str, Path],
+    pkl_path: Union[str, Path] = None,
     numerical_columns: List[str] = features.X_ALL_NUMERICAL,
     categorical_columns: List[str] = features.X_METADATA_CATEGORICAL,
 ) -> Pipeline:
@@ -414,7 +421,7 @@ def build_model_pipeline(
 
     algo = algo.lower()
 
-    if algo == "random_forest":
+    if algo == "random_forest" or algo == "rf":
         regressor = RandomForestRegressor(**best_params)
     elif algo == "svm":
         regressor = SVR(**best_params)
@@ -422,10 +429,10 @@ def build_model_pipeline(
         regressor = MLPRegressor(**best_params)
     elif algo == "xgboost" or algo == "xgb":
         regressor = XGBRegressor(**best_params)
-    elif algo == "lightgbm":
+    elif algo == "lightgbm" or algo == "lightGBM":
         regressor = LGBMRegressor(**best_params)
     elif algo == "catboost":
-        regressor = CatBoostRegressor(verbose=0, **best_params)
+        regressor = CatBoostRegressor(**best_params)
     else:
         raise ValueError(f"Unknown algorithm: {algo}")
 
@@ -445,8 +452,9 @@ def build_model_pipeline(
 
     pipeline.fit(X, y)
 
-    pkl_path = Path(pkl_path)
-    pkl_path.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(pipeline, pkl_path)
+    if pkl_path:
+        pkl_path = Path(pkl_path)
+        pkl_path.parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump(pipeline, pkl_path)
 
     return pipeline

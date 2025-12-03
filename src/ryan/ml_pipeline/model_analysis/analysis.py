@@ -770,3 +770,360 @@ def eval_feature_ablation(
         pass
 
     return df_results
+
+
+# TODO CHnage the color plot of the model to that of sns instead. This is so that I won't get confused with the products.
+# TODO Maybe make it in a way that I can pre-compute the SHAP values and just pass them in. RF currently takes forever.
+def plot_shap_multi_models(
+    column_name: str,
+    df_dataset: pd.DataFrame,
+    pipeline_xgb: Union[str, Path, Pipeline, RegressorMixin],
+    pipeline_lgbm: Union[str, Path, Pipeline, RegressorMixin],
+    pipeline_catboost: Union[str, Path, Pipeline, RegressorMixin],
+    pipeline_rf: Union[str, Path, Pipeline, RegressorMixin],
+    ls_numerical_columns: Optional[List[str]] = None,
+    ls_categorical_columns: Optional[List[str]] = None,
+    color_xgb: str = "orange",
+    color_lgbm: str = "deeppink",
+    color_catboost: str = "dodgerblue",
+    color_rf: str = "seagreen",
+) -> None:
+    """
+    Plot SHAP dependence for a single *input feature* across four tree-based models.
+
+    For a given input feature `column_name`, this function produces a scatter plot:
+        x-axis: raw values of `column_name` from df_dataset
+        y-axis: SHAP values for `column_name` (per model)
+
+    Models are expected to be sklearn Pipelines built like:
+
+        Pipeline([
+            ("preprocessor", ColumnTransformer([
+                ("num", StandardScaler(), numerical_columns),
+                ("cat", OneHotEncoder(handle_unknown="ignore"), categorical_columns),
+            ])),
+            ("model", <tree_regressor>),
+        ])
+
+    Notes:
+        - `column_name` MUST be in the input feature space, i.e. in
+          `ls_numerical_columns` or `ls_categorical_columns`.
+        - Target/FE columns (like 'fe-H2' if they are the regression target) are
+          NOT valid here unless they are also part of the model input.
+
+    Args:
+        column_name:
+            Name of the *input* feature to analyse.
+        df_dataset:
+            Cleaned DataFrame containing at least all input features. No dropna is
+            done inside this function.
+        pipeline_xgb, pipeline_lgbm, pipeline_catboost, pipeline_rf:
+            Pipelines or paths to pickled pipelines built via build_model_pipeline.
+        ls_numerical_columns:
+            List of numerical input feature names.
+            Default: features.X_ALL_NUMERICAL.
+        ls_categorical_columns:
+            List of categorical input feature names.
+            Default: features.X_METADATA_CATEGORICAL.
+    """
+
+    # -------------------------------------------------------------------------
+    # Defaults for feature lists
+    # -------------------------------------------------------------------------
+    if ls_numerical_columns is None:
+        ls_numerical_columns = list(features.X_ALL_NUMERICAL)
+    else:
+        ls_numerical_columns = list(ls_numerical_columns)
+
+    if ls_categorical_columns is None:
+        ls_categorical_columns = list(features.X_METADATA_CATEGORICAL)
+    else:
+        ls_categorical_columns = list(ls_categorical_columns)
+
+    # Sanity: column_name must be an input feature
+    if column_name not in ls_numerical_columns and column_name not in ls_categorical_columns:
+        raise ValueError(
+            f"column_name='{column_name}' must be in numerical or categorical input "
+            f"features, but it is not. Currently:\n"
+            f"  numerical: {column_name in ls_numerical_columns}\n"
+            f"  categorical: {column_name in ls_categorical_columns}"
+        )
+
+    # -------------------------------------------------------------------------
+    # Helpers
+    # -------------------------------------------------------------------------
+    def _ensure_pipeline(
+        pipeline_or_path: Union[str, Path, Pipeline, RegressorMixin],
+    ) -> Union[Pipeline, RegressorMixin]:
+        """Load a pickled sklearn Pipeline / estimator if a path is given."""
+        if isinstance(pipeline_or_path, (Pipeline, RegressorMixin)):
+            return pipeline_or_path
+
+        p = Path(pipeline_or_path)
+        if p.suffix.lower() in {".pkl", ".pickle"}:
+            return joblib.load(p)
+
+        raise ValueError(f"Unsupported pipeline type/path: {pipeline_or_path}")
+
+    def _split_pipeline(
+        pipe_or_est: Union[Pipeline, RegressorMixin],
+    ) -> Tuple[Optional[ColumnTransformer], RegressorMixin]:
+        """
+        Split into (preprocessor, estimator).
+
+        For build_model_pipeline, we expect:
+            - 'preprocessor': ColumnTransformer
+            - 'model': tree regressor
+        """
+        if isinstance(pipe_or_est, Pipeline):
+            preprocessor = pipe_or_est.named_steps.get("preprocessor")
+            model = pipe_or_est.named_steps.get("model")
+
+            if model is None:
+                raise ValueError("Pipeline has no 'model' step.")
+
+            if preprocessor is not None and not isinstance(preprocessor, ColumnTransformer):
+                raise TypeError("Expected 'preprocessor' step to be a ColumnTransformer. Check build_model_pipeline.")
+            return preprocessor, model
+
+        # Bare estimator
+        return None, pipe_or_est  # type: ignore[return-value]
+
+    def _get_feature_indices_for_column(
+        preprocessor: ColumnTransformer,
+        original_column: str,
+        numerical_columns: List[str],
+        categorical_columns: List[str],
+    ) -> List[int]:
+        """
+        Map original feature -> indices in transformed feature space.
+
+        ColumnTransformer is assumed to be:
+
+            transformers=[
+                ("num", StandardScaler(), numerical_columns),
+                ("cat", OneHotEncoder(handle_unknown="ignore"), categorical_columns),
+            ]
+
+        get_feature_names_out() then yields names like:
+            "num__<num_feature>"
+            "cat__<cat_feature>_<category>"
+        """
+        feature_names = preprocessor.get_feature_names_out()
+        indices: List[int] = []
+
+        if original_column in numerical_columns:
+            # Expect exactly one transformed feature: "num__<original_column>"
+            suffix = f"__{original_column}"
+            indices = [i for i, name in enumerate(feature_names) if name.endswith(suffix)]
+
+        elif original_column in categorical_columns:
+            # Multiple one-hot columns: "cat__<original_column>_<category>"
+            prefix = f"cat__{original_column}_"
+            indices = [i for i, name in enumerate(feature_names) if name.startswith(prefix)]
+
+        else:
+            raise ValueError(f"Column '{original_column}' not found in numerical or categorical columns.")
+
+        if not indices:
+            raise ValueError(
+                f"No transformed features found for original column '{original_column}'. "
+                "Check ColumnTransformer structure and feature names."
+            )
+
+        return indices
+
+    def _shap_for_single_feature(
+        pipe_or_est: Union[Pipeline, RegressorMixin],
+        X_raw: pd.DataFrame,
+        numerical_columns: List[str],
+        categorical_columns: List[str],
+        feature_name: str,
+    ) -> np.ndarray:
+        """
+        Compute SHAP values for a single *original* input feature.
+
+        - If numeric: directly the one transformed column.
+        - If categorical: sum SHAP over all OHE columns corresponding to this feature.
+
+        Returns:
+            1D array of shape (n_samples,) with SHAP values for `feature_name`.
+        """
+        preprocessor, model = _split_pipeline(pipe_or_est)
+
+        if preprocessor is not None:
+            X_trans = preprocessor.transform(X_raw)
+            feature_indices = _get_feature_indices_for_column(
+                preprocessor,
+                feature_name,
+                numerical_columns,
+                categorical_columns,
+            )
+        else:
+            # Fallback: no preprocessor, assume direct mapping X_raw -> model
+            X_trans = X_raw.values
+            feature_indices = [X_raw.columns.get_loc(feature_name)]
+
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(X_trans)
+
+        # For single-output regressors we expect (n_samples, n_features)
+        if isinstance(shap_values, list):
+            # In rare multi-output cases, average absolute contributions across outputs
+            shap_array = np.mean([np.abs(a) for a in shap_values], axis=0)
+        else:
+            shap_array = shap_values
+
+        shap_feat = shap_array[:, feature_indices]  # (n_samples, k_dummies or 1)
+
+        if shap_feat.ndim == 2 and shap_feat.shape[1] > 1:
+            # Categorical -> sum contributions of its dummies
+            shap_agg = shap_feat.sum(axis=1)
+        else:
+            shap_agg = shap_feat.ravel()
+
+        return shap_agg
+
+    # -------------------------------------------------------------------------
+    # Build X and x_vals
+    # -------------------------------------------------------------------------
+    df = df_dataset.copy()
+
+    # ensure categorical dtype for preprocessor
+    if ls_categorical_columns:
+        df[ls_categorical_columns] = df[ls_categorical_columns].astype("category")
+
+    # input matrix to the model
+    X = df[ls_numerical_columns + ls_categorical_columns]
+
+    if column_name not in X.columns:
+        raise ValueError(
+            f"column_name='{column_name}' is not in the input feature matrix X. "
+            "It must be one of numerical or categorical input features."
+        )
+
+    # raw values for x-axis (this is the actual feature values)
+    x_vals = df[column_name]
+
+    # -------------------------------------------------------------------------
+    # Load pipelines
+    # -------------------------------------------------------------------------
+    pipe_xgb = _ensure_pipeline(pipeline_xgb)
+    pipe_lgbm = _ensure_pipeline(pipeline_lgbm)
+    pipe_cat = _ensure_pipeline(pipeline_catboost)
+    # pipe_rf = _ensure_pipeline(pipeline_rf)
+
+    # -------------------------------------------------------------------------
+    # Compute SHAP for *this* feature for each model
+    # -------------------------------------------------------------------------
+    shap_xgb = _shap_for_single_feature(pipe_xgb, X, ls_numerical_columns, ls_categorical_columns, column_name)
+    shap_lgbm = _shap_for_single_feature(pipe_lgbm, X, ls_numerical_columns, ls_categorical_columns, column_name)
+    shap_cat = _shap_for_single_feature(pipe_cat, X, ls_numerical_columns, ls_categorical_columns, column_name)
+    # shap_rf = _shap_for_single_feature(
+    #     pipe_rf, X, ls_numerical_columns, ls_categorical_columns, column_name
+    # )
+
+    # -------------------------------------------------------------------------
+    # Plot: x = feature value, y = SHAP(feature)
+    # -------------------------------------------------------------------------
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Scatter(
+            x=x_vals,
+            y=shap_xgb,
+            mode="markers",
+            marker=dict(color=color_xgb, opacity=0.35),
+            name="XGBoost",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=x_vals,
+            y=shap_lgbm,
+            mode="markers",
+            marker=dict(color=color_lgbm, opacity=0.35),
+            name="LightGBM",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=x_vals,
+            y=shap_cat,
+            mode="markers",
+            marker=dict(color=color_catboost, opacity=0.35),
+            name="CatBoost",
+        )
+    )
+    # fig.add_trace(
+    #     go.Scatter(
+    #         x=x_vals,
+    #         y=shap_rf,
+    #         mode="markers",
+    #         marker=dict(color=color_rf, opacity=0.35),
+    #         name="Random Forest",
+    #     )
+    # )
+
+    fig.update_layout(
+        title=f"SHAP values for feature '{column_name}' (4 models)",
+        xaxis_title=column_name,
+        yaxis_title="SHAP value",
+        width=1400 * 0.9,
+        height=600 * 0.9,
+        showlegend=True,
+        font=dict(size=16, color="black"),
+        legend=dict(
+            title="Algorithm",
+            orientation="v",
+            y=0.5,
+            yanchor="middle",
+            x=-0.18,
+            xanchor="right",
+            bgcolor="rgba(255,255,255,0.0)",
+            bordercolor="rgba(0,0,0,0)",
+            font=dict(size=16, color="black"),
+        ),
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        margin=dict(l=40, r=40, b=60, t=60),
+    )
+
+    # boxed axes
+    fig.update_xaxes(
+        showline=True,
+        linewidth=2,
+        linecolor="black",
+        mirror=True,
+        showgrid=True,
+        gridwidth=1,
+        gridcolor="LightGrey",
+        tickfont=dict(size=16, color="black"),
+        title_font=dict(size=18, color="black"),
+    )
+    fig.update_yaxes(
+        showline=True,
+        linewidth=2,
+        linecolor="black",
+        mirror=True,
+        showgrid=True,
+        gridwidth=1,
+        gridcolor="LightGrey",
+        tickfont=dict(size=16, color="black"),
+        title_font=dict(size=18, color="black"),
+    )
+
+    # zero line
+    fig.add_shape(
+        type="line",
+        xref="paper",
+        x0=0,
+        x1=1,
+        yref="y",
+        y0=0,
+        y1=0,
+        line=dict(color="black", width=2, dash="dash"),
+        layer="above",
+    )
+
+    fig.show()

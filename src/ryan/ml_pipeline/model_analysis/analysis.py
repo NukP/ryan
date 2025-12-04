@@ -1031,3 +1031,204 @@ def plot_shap_multi_models(
     )
 
     fig.show()
+
+
+def plot_shap_multi_products(
+    column_name: str,
+    df_dataset: pd.DataFrame,
+    shap_H2_path: Union[str, Path],
+    shap_C2H4_path: Union[str, Path],
+    shap_CH4_path: Union[str, Path],
+    shap_1_propanol_path: Union[str, Path],
+    shap_Acetaldehyde_path: Union[str, Path],
+    shap_EtOH_path: Union[str, Path],
+    X_numerical: List[str] = features.X_ALL_NUMERICAL,
+    X_category: List[str] = features.X_METADATA_CATEGORICAL,
+) -> None:
+    """
+    Plot SHAP dependence for a single *input feature* across multiple product models,
+    using precomputed SHAP tables saved as .pkl files.
+
+    For a given input feature `column_name`, this function produces a scatter plot:
+        x-axis: raw values of `column_name` from df_dataset
+        y-axis: SHAP values for `column_name` (per product-specific model)
+
+    SHAP tables are expected to be created by `ml_util.compute_shap_table`, i.e.
+    each .pkl contains a dict with keys:
+        - "shap_values":   (n_samples, n_transformed_features)
+        - "feature_names": (n_transformed_features,)
+
+    Args:
+        column_name:
+            Name of the *input* feature to analyse.
+        df_dataset:
+            Cleaned DataFrame containing at least all input features.
+            Must be the same row order as used for SHAP computation.
+        shap_H2_path, shap_C2H4_path, shap_CH4_path, shap_1_propanol_path,
+        shap_Acetaldehyde_path, shap_EtOH_path:
+            Paths to .pkl SHAP tables generated for each product model.
+            Argument names mirror `features.PRODUCTS` without the 'fe-' prefix.
+        X_numerical:
+            Numerical input feature names (default from features.X_ALL_NUMERICAL).
+        X_category:
+            Categorical input feature names (default from features.X_METADATA_CATEGORICAL).
+    """
+
+    if column_name not in X_numerical and column_name not in X_category:
+        raise ValueError(
+            f"column_name='{column_name}' must be in numerical or categorical input features.\n"
+            f"  numerical: {column_name in X_numerical}\n"
+            f"  categorical: {column_name in X_category}"
+        )
+    if column_name not in df_dataset.columns:
+        raise ValueError(f"'{column_name}' not found in df_dataset columns.")
+
+    def _get_feature_indices_for_column(
+        feature_names: np.ndarray,
+        original_column: str,
+        numerical_columns: List[str],
+        categorical_columns: List[str],
+    ) -> List[int]:
+        indices: List[int] = []
+
+        if original_column in numerical_columns:
+            suffix = f"__{original_column}"
+            indices = [i for i, name in enumerate(feature_names) if name.endswith(suffix)]
+        elif original_column in categorical_columns:
+            prefix = f"cat__{original_column}_"
+            indices = [i for i, name in enumerate(feature_names) if name.startswith(prefix)]
+        else:
+            raise ValueError(f"Column '{original_column}' not found in numerical or categorical columns.")
+
+        if not indices:
+            raise ValueError(
+                f"No transformed features found for original column '{original_column}'. "
+                "Check feature_names and ColumnTransformer structure."
+            )
+
+        return indices
+
+    def _load_shap(path: Union[str, Path]) -> tuple[np.ndarray, np.ndarray]:
+        payload = joblib.load(path)
+        shap_values = payload["shap_values"]
+        feature_names = payload["feature_names"]
+        return shap_values, feature_names
+
+    def _extract_feature_shap(
+        shap_values: np.ndarray,
+        feature_names: np.ndarray,
+        feature_name: str,
+        numerical_columns: List[str],
+        categorical_columns: List[str],
+    ) -> np.ndarray:
+        idx = _get_feature_indices_for_column(feature_names, feature_name, numerical_columns, categorical_columns)
+        shap_feat = shap_values[:, idx]
+        if shap_feat.ndim == 2 and shap_feat.shape[1] > 1:
+            return shap_feat.sum(axis=1)
+        return shap_feat.ravel()
+
+    x_vals = df_dataset[column_name]
+
+    product_paths = [
+        ("fe-H2", "fe-H₂", shap_H2_path),
+        ("fe-C2H4", "fe-C₂H₄", shap_C2H4_path),
+        ("fe-CH4", "fe-CH₄", shap_CH4_path),
+        ("fe-1-propanol", "fe-1-propanol", shap_1_propanol_path),
+        ("fe-Acetaldehyde", "fe-Acetaldehyde", shap_Acetaldehyde_path),
+        ("fe-EtOH", "fe-EtOH", shap_EtOH_path),
+    ]
+
+    loaded_products: List[tuple[str, str, np.ndarray, np.ndarray]] = []
+    n_samples = len(df_dataset)
+    for product_id, product_label, path in product_paths:
+        shap_vals, feature_names = _load_shap(path)
+        if shap_vals.shape[0] != n_samples:
+            raise ValueError(
+                f"SHAP table for {product_id} has {shap_vals.shape[0]} samples, but df_dataset has {n_samples}. "
+                "They must match."
+            )
+        loaded_products.append((product_id, product_label, shap_vals, feature_names))
+
+    product_to_color = {
+        "fe-H2": "orange",
+        "fe-C2H4": "dodgerblue",
+        "fe-CH4": "deeppink",
+        "fe-1-propanol": "mediumseagreen",
+        "fe-Acetaldehyde": "mediumpurple",
+        "fe-EtOH": "firebrick",
+    }
+
+    fig = go.Figure()
+
+    for product_id, product_label, shap_vals, feature_names in loaded_products:
+        y_vals = _extract_feature_shap(shap_vals, feature_names, column_name, X_numerical, X_category)
+        fig.add_trace(
+            go.Scatter(
+                x=x_vals,
+                y=y_vals,
+                mode="markers",
+                marker=dict(color=product_to_color[product_id], opacity=0.35),
+                name=product_label,
+            )
+        )
+
+    fig.update_layout(
+        title=f"SHAP values for feature '{column_name}' across products",
+        xaxis_title=column_name,
+        yaxis_title="SHAP value",
+        width=1400 * 0.9,
+        height=600 * 0.9,
+        showlegend=True,
+        font=dict(size=16, color="black"),
+        legend=dict(
+            title="Product",
+            orientation="v",
+            y=0.5,
+            yanchor="middle",
+            x=-0.18,
+            xanchor="right",
+            bgcolor="rgba(255,255,255,0.0)",
+            bordercolor="rgba(0,0,0,0)",
+            font=dict(size=16, color="black"),
+        ),
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        margin=dict(l=40, r=40, b=60, t=60),
+    )
+
+    fig.update_xaxes(
+        showline=True,
+        linewidth=2,
+        linecolor="black",
+        mirror=True,
+        showgrid=True,
+        gridwidth=1,
+        gridcolor="LightGrey",
+        tickfont=dict(size=16, color="black"),
+        title_font=dict(size=18, color="black"),
+    )
+    fig.update_yaxes(
+        showline=True,
+        linewidth=2,
+        linecolor="black",
+        mirror=True,
+        showgrid=True,
+        gridwidth=1,
+        gridcolor="LightGrey",
+        tickfont=dict(size=16, color="black"),
+        title_font=dict(size=18, color="black"),
+    )
+
+    fig.add_shape(
+        type="line",
+        xref="paper",
+        x0=0,
+        x1=1,
+        yref="y",
+        y0=0,
+        y1=0,
+        line=dict(color="black", width=2, dash="dash"),
+        layer="above",
+    )
+
+    fig.show()

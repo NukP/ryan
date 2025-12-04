@@ -13,6 +13,7 @@ import joblib
 import numpy as np
 import optuna
 import pandas as pd
+import shap
 from catboost import CatBoostRegressor
 from lightgbm import LGBMRegressor
 from sklearn.base import RegressorMixin, clone
@@ -458,3 +459,95 @@ def build_model_pipeline(
         joblib.dump(pipeline, pkl_path)
 
     return pipeline
+
+
+def compute_shap_table(
+    df_dataset: pd.DataFrame,
+    pipeline: Union[str, Path, Pipeline, RegressorMixin],
+    out_path: Union[str, Path],
+    X_numerical: List[str] = features.X_ALL_NUMERICAL,
+    X_category: List[str] = features.X_METADATA_CATEGORICAL,
+) -> None:
+    """
+    Compute the full SHAP value table for a trained tree-based regression pipeline
+    and save it to a .pkl file.
+
+    The .pkl file will contain a dict with:
+        - "shap_values":   ndarray of shape (n_samples, n_transformed_features)
+        - "feature_names": ndarray of transformed feature names
+
+
+    Args:
+        df_dataset:
+            Clean DataFrame containing the model input features.
+        pipeline:
+            Trained sklearn Pipeline or path to pipeline .pkl.
+        out_path:
+            File path where SHAP table (dict) will be saved.
+        X_numerical:
+            Numerical input feature names (default from features.X_ALL_NUMERICAL)
+        X_category:
+            Categorical input feature names (default from features.X_METADATA_CATEGORICAL)
+    """
+
+    # -------------------------------------------------------------------------
+    # Load pipeline if a path is provided
+    # -------------------------------------------------------------------------
+    if isinstance(pipeline, (str, Path)):
+        pipeline = joblib.load(pipeline)
+
+    # Split pipeline into preprocessor + model
+    if isinstance(pipeline, Pipeline):
+        preprocessor = pipeline.named_steps.get("preprocessor")
+        model = pipeline.named_steps.get("model")
+        if model is None:
+            raise ValueError("Pipeline has no 'model' step.")
+        if preprocessor is not None and not isinstance(preprocessor, ColumnTransformer):
+            raise TypeError("Expected 'preprocessor' to be a ColumnTransformer.")
+    else:
+        # Bare estimator
+        preprocessor = None
+        model = pipeline
+
+    # -------------------------------------------------------------------------
+    # Build X matrix
+    # -------------------------------------------------------------------------
+    df = df_dataset.copy()
+    if X_category:
+        df[X_category] = df[X_category].astype("category")
+
+    X = df[X_numerical + X_category]
+
+    # Transform X through the pipeline's preprocessor
+    if preprocessor is not None:
+        X_trans = preprocessor.transform(X)
+        feature_names = preprocessor.get_feature_names_out()
+    else:
+        X_trans = X.values
+        feature_names = X.columns.to_numpy()
+
+    # -------------------------------------------------------------------------
+    # Compute SHAP on transformed features (expensive step, done once)
+    # -------------------------------------------------------------------------
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(X_trans)
+
+    # Safe handling when SHAP returns a list for multi-output models
+    if isinstance(shap_values, list):
+        shap_values = np.mean(np.stack(shap_values, axis=0), axis=0)
+
+    if shap_values.ndim != 2:
+        raise ValueError(f"Expected SHAP matrix to be 2D, got shape {shap_values.shape}.")
+
+    # -------------------------------------------------------------------------
+    # Save SHAP table as .pkl
+    # -------------------------------------------------------------------------
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    payload = {
+        "shap_values": shap_values,
+        "feature_names": feature_names,
+    }
+
+    joblib.dump(payload, out_path)

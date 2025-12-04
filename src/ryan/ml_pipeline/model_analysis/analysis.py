@@ -776,7 +776,7 @@ def plot_shap_multi_models(
     column_name: str,
     df_dataset: pd.DataFrame,
     shap_xgb_path: Union[str, Path],
-    shap_lgbm_path: Union[str, Path],
+    shap_lightgbm_path: Union[str, Path],
     shap_catboost_path: Union[str, Path],
     shap_rf_path: Union[str, Path],
     X_numerical: List[str] = features.X_ALL_NUMERICAL,
@@ -897,7 +897,7 @@ def plot_shap_multi_models(
     # Load SHAP tables
     # -------------------------------------------------------------------------
     shap_xgb, fn_xgb = _load_shap(shap_xgb_path)
-    shap_lgbm, fn_lgbm = _load_shap(shap_lgbm_path)
+    shap_lgbm, fn_lgbm = _load_shap(shap_lightgbm_path)
     shap_cat, fn_cat = _load_shap(shap_catboost_path)
     shap_rf, fn_rf = _load_shap(shap_rf_path)
 

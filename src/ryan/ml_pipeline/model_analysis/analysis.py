@@ -424,6 +424,7 @@ def compute_shap_feature_importance(
     return feature_importance_df
 
 
+# !! This function recompute the model, and do not take into account the hyper-parameter tuning.
 def plot_shap_scatter_checkbox(
     column_name: str,
     dir_dataset: Union[str, Path],

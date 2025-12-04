@@ -926,8 +926,9 @@ def plot_shap_multi_models(
     # Plot: x = feature value, y = SHAP(feature)
     # -------------------------------------------------------------------------
     algos = ["xgb", "catboost", "lightgbm", "rf"]
-    palette = sns.color_palette("tab10", n_colors=len(algos))
-    algo_to_color = {algo: palette[i] for i, algo in enumerate(algos)}
+    palette_hex = sns.color_palette("tab10", n_colors=len(algos)).as_hex()
+    algo_to_color = {algo: palette_hex[i] for i, algo in enumerate(algos)}
+
     fig = go.Figure()
 
     fig.add_trace(
@@ -968,7 +969,7 @@ def plot_shap_multi_models(
     )
 
     fig.update_layout(
-        title=f"SHAP values for feature '{column_name}' (4 models, precomputed)",
+        title=f"SHAP values for feature '{column_name}",
         xaxis_title=column_name,
         yaxis_title="SHAP value",
         width=1400 * 0.9,

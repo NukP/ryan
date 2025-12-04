@@ -772,7 +772,6 @@ def eval_feature_ablation(
     return df_results
 
 
-# TODO CHnage the color plot of the model to that of sns instead. This is so that I won't get confused with the products.
 def plot_shap_multi_models(
     column_name: str,
     df_dataset: pd.DataFrame,

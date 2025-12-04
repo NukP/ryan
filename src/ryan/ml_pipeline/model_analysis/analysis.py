@@ -773,41 +773,32 @@ def eval_feature_ablation(
 
 
 # TODO CHnage the color plot of the model to that of sns instead. This is so that I won't get confused with the products.
-# TODO Maybe make it in a way that I can pre-compute the SHAP values and just pass them in. RF currently takes forever.
 def plot_shap_multi_models(
     column_name: str,
     df_dataset: pd.DataFrame,
-    pipeline_xgb: Union[str, Path, Pipeline, RegressorMixin],
-    pipeline_lgbm: Union[str, Path, Pipeline, RegressorMixin],
-    pipeline_catboost: Union[str, Path, Pipeline, RegressorMixin],
-    pipeline_rf: Union[str, Path, Pipeline, RegressorMixin],
-    ls_numerical_columns: Optional[List[str]] = None,
-    ls_categorical_columns: Optional[List[str]] = None,
-    color_xgb: str = "orange",
-    color_lgbm: str = "deeppink",
-    color_catboost: str = "dodgerblue",
-    color_rf: str = "seagreen",
+    shap_xgb_path: Union[str, Path],
+    shap_lgbm_path: Union[str, Path],
+    shap_catboost_path: Union[str, Path],
+    shap_rf_path: Union[str, Path],
+    X_numerical: List[str] = features.X_ALL_NUMERICAL,
+    X_category: List[str] = features.X_METADATA_CATEGORICAL,
 ) -> None:
     """
-    Plot SHAP dependence for a single *input feature* across four tree-based models.
+    Plot SHAP dependence for a single *input feature* across four tree-based models,
+    using precomputed SHAP tables saved as .pkl files.
 
     For a given input feature `column_name`, this function produces a scatter plot:
         x-axis: raw values of `column_name` from df_dataset
         y-axis: SHAP values for `column_name` (per model)
 
-    Models are expected to be sklearn Pipelines built like:
-
-        Pipeline([
-            ("preprocessor", ColumnTransformer([
-                ("num", StandardScaler(), numerical_columns),
-                ("cat", OneHotEncoder(handle_unknown="ignore"), categorical_columns),
-            ])),
-            ("model", <tree_regressor>),
-        ])
+    SHAP tables are expected to be created by `compute_and_save_shap_table`, i.e.
+    each .pkl contains a dict with keys:
+        - "shap_values":   (n_samples, n_transformed_features)
+        - "feature_names": (n_transformed_features,)
 
     Notes:
         - `column_name` MUST be in the input feature space, i.e. in
-          `ls_numerical_columns` or `ls_categorical_columns`.
+          `X_numerical` or `X_category`.
         - Target/FE columns (like 'fe-H2' if they are the regression target) are
           NOT valid here unless they are also part of the model input.
 
@@ -815,82 +806,32 @@ def plot_shap_multi_models(
         column_name:
             Name of the *input* feature to analyse.
         df_dataset:
-            Cleaned DataFrame containing at least all input features. No dropna is
-            done inside this function.
-        pipeline_xgb, pipeline_lgbm, pipeline_catboost, pipeline_rf:
-            Pipelines or paths to pickled pipelines built via build_model_pipeline.
-        ls_numerical_columns:
-            List of numerical input feature names.
-            Default: features.X_ALL_NUMERICAL.
-        ls_categorical_columns:
-            List of categorical input feature names.
-            Default: features.X_METADATA_CATEGORICAL.
+            Cleaned DataFrame containing at least all input features.
+            Must be the same row order as used for SHAP computation.
+        shap_xgb_path, shap_lgbm_path, shap_catboost_path, shap_rf_path:
+            Paths to .pkl SHAP tables generated for each model.
+        X_numerical:
+            Numerical input feature names (default from features.X_ALL_NUMERICAL).
+        X_category:
+            Categorical input feature names (default from features.X_METADATA_CATEGORICAL).
     """
 
     # -------------------------------------------------------------------------
-    # Defaults for feature lists
-    # -------------------------------------------------------------------------
-    if ls_numerical_columns is None:
-        ls_numerical_columns = list(features.X_ALL_NUMERICAL)
-    else:
-        ls_numerical_columns = list(ls_numerical_columns)
-
-    if ls_categorical_columns is None:
-        ls_categorical_columns = list(features.X_METADATA_CATEGORICAL)
-    else:
-        ls_categorical_columns = list(ls_categorical_columns)
-
     # Sanity: column_name must be an input feature
-    if column_name not in ls_numerical_columns and column_name not in ls_categorical_columns:
+    # -------------------------------------------------------------------------
+    if column_name not in X_numerical and column_name not in X_category:
         raise ValueError(
             f"column_name='{column_name}' must be in numerical or categorical input "
-            f"features, but it is not. Currently:\n"
-            f"  numerical: {column_name in ls_numerical_columns}\n"
-            f"  categorical: {column_name in ls_categorical_columns}"
+            f"features, but it is not.\n"
+            f"  numerical: {column_name in X_numerical}\n"
+            f"  categorical: {column_name in X_category}"
         )
 
     # -------------------------------------------------------------------------
-    # Helpers
+    # Helper: map original feature -> indices in transformed feature_names
     # -------------------------------------------------------------------------
-    def _ensure_pipeline(
-        pipeline_or_path: Union[str, Path, Pipeline, RegressorMixin],
-    ) -> Union[Pipeline, RegressorMixin]:
-        """Load a pickled sklearn Pipeline / estimator if a path is given."""
-        if isinstance(pipeline_or_path, (Pipeline, RegressorMixin)):
-            return pipeline_or_path
-
-        p = Path(pipeline_or_path)
-        if p.suffix.lower() in {".pkl", ".pickle"}:
-            return joblib.load(p)
-
-        raise ValueError(f"Unsupported pipeline type/path: {pipeline_or_path}")
-
-    def _split_pipeline(
-        pipe_or_est: Union[Pipeline, RegressorMixin],
-    ) -> Tuple[Optional[ColumnTransformer], RegressorMixin]:
-        """
-        Split into (preprocessor, estimator).
-
-        For build_model_pipeline, we expect:
-            - 'preprocessor': ColumnTransformer
-            - 'model': tree regressor
-        """
-        if isinstance(pipe_or_est, Pipeline):
-            preprocessor = pipe_or_est.named_steps.get("preprocessor")
-            model = pipe_or_est.named_steps.get("model")
-
-            if model is None:
-                raise ValueError("Pipeline has no 'model' step.")
-
-            if preprocessor is not None and not isinstance(preprocessor, ColumnTransformer):
-                raise TypeError("Expected 'preprocessor' step to be a ColumnTransformer. Check build_model_pipeline.")
-            return preprocessor, model
-
-        # Bare estimator
-        return None, pipe_or_est  # type: ignore[return-value]
-
     def _get_feature_indices_for_column(
-        preprocessor: ColumnTransformer,
+        feature_names: np.ndarray,
         original_column: str,
         numerical_columns: List[str],
         categorical_columns: List[str],
@@ -898,175 +839,137 @@ def plot_shap_multi_models(
         """
         Map original feature -> indices in transformed feature space.
 
-        ColumnTransformer is assumed to be:
-
-            transformers=[
-                ("num", StandardScaler(), numerical_columns),
-                ("cat", OneHotEncoder(handle_unknown="ignore"), categorical_columns),
-            ]
-
-        get_feature_names_out() then yields names like:
+        Assumes ColumnTransformer naming from build_model_pipeline:
             "num__<num_feature>"
             "cat__<cat_feature>_<category>"
         """
-        feature_names = preprocessor.get_feature_names_out()
         indices: List[int] = []
 
         if original_column in numerical_columns:
-            # Expect exactly one transformed feature: "num__<original_column>"
             suffix = f"__{original_column}"
             indices = [i for i, name in enumerate(feature_names) if name.endswith(suffix)]
-
         elif original_column in categorical_columns:
-            # Multiple one-hot columns: "cat__<original_column>_<category>"
             prefix = f"cat__{original_column}_"
             indices = [i for i, name in enumerate(feature_names) if name.startswith(prefix)]
-
         else:
             raise ValueError(f"Column '{original_column}' not found in numerical or categorical columns.")
 
         if not indices:
             raise ValueError(
                 f"No transformed features found for original column '{original_column}'. "
-                "Check ColumnTransformer structure and feature names."
+                "Check feature_names and ColumnTransformer structure."
             )
 
         return indices
 
-    def _shap_for_single_feature(
-        pipe_or_est: Union[Pipeline, RegressorMixin],
-        X_raw: pd.DataFrame,
+    def _load_shap(path: Union[str, Path]) -> tuple[np.ndarray, np.ndarray]:
+        payload = joblib.load(path)
+        shap_values = payload["shap_values"]
+        feature_names = payload["feature_names"]
+        return shap_values, feature_names
+
+    def _extract_feature_shap(
+        shap_values: np.ndarray,
+        feature_names: np.ndarray,
+        feature_name: str,
         numerical_columns: List[str],
         categorical_columns: List[str],
-        feature_name: str,
     ) -> np.ndarray:
         """
-        Compute SHAP values for a single *original* input feature.
-
-        - If numeric: directly the one transformed column.
-        - If categorical: sum SHAP over all OHE columns corresponding to this feature.
-
-        Returns:
-            1D array of shape (n_samples,) with SHAP values for `feature_name`.
+        Given a full SHAP matrix for a model, extract SHAP values for a single
+        original feature (aggregating over OHE dummies if needed).
         """
-        preprocessor, model = _split_pipeline(pipe_or_est)
-
-        if preprocessor is not None:
-            X_trans = preprocessor.transform(X_raw)
-            feature_indices = _get_feature_indices_for_column(
-                preprocessor,
-                feature_name,
-                numerical_columns,
-                categorical_columns,
-            )
-        else:
-            # Fallback: no preprocessor, assume direct mapping X_raw -> model
-            X_trans = X_raw.values
-            feature_indices = [X_raw.columns.get_loc(feature_name)]
-
-        explainer = shap.TreeExplainer(model)
-        shap_values = explainer.shap_values(X_trans)
-
-        # For single-output regressors we expect (n_samples, n_features)
-        if isinstance(shap_values, list):
-            # In rare multi-output cases, average absolute contributions across outputs
-            shap_array = np.mean([np.abs(a) for a in shap_values], axis=0)
-        else:
-            shap_array = shap_values
-
-        shap_feat = shap_array[:, feature_indices]  # (n_samples, k_dummies or 1)
+        idx = _get_feature_indices_for_column(feature_names, feature_name, numerical_columns, categorical_columns)
+        shap_feat = shap_values[:, idx]  # (n_samples, k_dummies or 1)
 
         if shap_feat.ndim == 2 and shap_feat.shape[1] > 1:
-            # Categorical -> sum contributions of its dummies
-            shap_agg = shap_feat.sum(axis=1)
-        else:
-            shap_agg = shap_feat.ravel()
-
-        return shap_agg
+            return shap_feat.sum(axis=1)  # aggregate categoricals
+        return shap_feat.ravel()
 
     # -------------------------------------------------------------------------
-    # Build X and x_vals
+    # x-axis values
     # -------------------------------------------------------------------------
-    df = df_dataset.copy()
+    if column_name not in df_dataset.columns:
+        raise ValueError(f"'{column_name}' not found in df_dataset columns.")
 
-    # ensure categorical dtype for preprocessor
-    if ls_categorical_columns:
-        df[ls_categorical_columns] = df[ls_categorical_columns].astype("category")
-
-    # input matrix to the model
-    X = df[ls_numerical_columns + ls_categorical_columns]
-
-    if column_name not in X.columns:
-        raise ValueError(
-            f"column_name='{column_name}' is not in the input feature matrix X. "
-            "It must be one of numerical or categorical input features."
-        )
-
-    # raw values for x-axis (this is the actual feature values)
-    x_vals = df[column_name]
+    x_vals = df_dataset[column_name]
 
     # -------------------------------------------------------------------------
-    # Load pipelines
+    # Load SHAP tables
     # -------------------------------------------------------------------------
-    pipe_xgb = _ensure_pipeline(pipeline_xgb)
-    pipe_lgbm = _ensure_pipeline(pipeline_lgbm)
-    pipe_cat = _ensure_pipeline(pipeline_catboost)
-    # pipe_rf = _ensure_pipeline(pipeline_rf)
+    shap_xgb, fn_xgb = _load_shap(shap_xgb_path)
+    shap_lgbm, fn_lgbm = _load_shap(shap_lgbm_path)
+    shap_cat, fn_cat = _load_shap(shap_catboost_path)
+    shap_rf, fn_rf = _load_shap(shap_rf_path)
+
+    # Optional sanity: check sample counts match df_dataset
+    n_samples = len(df_dataset)
+    for name, arr in [
+        ("XGBoost", shap_xgb),
+        ("LightGBM", shap_lgbm),
+        ("CatBoost", shap_cat),
+        ("Random Forest", shap_rf),
+    ]:
+        if arr.shape[0] != n_samples:
+            raise ValueError(
+                f"SHAP table for {name} has {arr.shape[0]} samples, but df_dataset has {n_samples}. They must match."
+            )
 
     # -------------------------------------------------------------------------
-    # Compute SHAP for *this* feature for each model
+    # Extract SHAP for this feature from each model
     # -------------------------------------------------------------------------
-    shap_xgb = _shap_for_single_feature(pipe_xgb, X, ls_numerical_columns, ls_categorical_columns, column_name)
-    shap_lgbm = _shap_for_single_feature(pipe_lgbm, X, ls_numerical_columns, ls_categorical_columns, column_name)
-    shap_cat = _shap_for_single_feature(pipe_cat, X, ls_numerical_columns, ls_categorical_columns, column_name)
-    # shap_rf = _shap_for_single_feature(
-    #     pipe_rf, X, ls_numerical_columns, ls_categorical_columns, column_name
-    # )
+    y_xgb = _extract_feature_shap(shap_xgb, fn_xgb, column_name, X_numerical, X_category)
+    y_lgbm = _extract_feature_shap(shap_lgbm, fn_lgbm, column_name, X_numerical, X_category)
+    y_cat = _extract_feature_shap(shap_cat, fn_cat, column_name, X_numerical, X_category)
+    y_rf = _extract_feature_shap(shap_rf, fn_rf, column_name, X_numerical, X_category)
 
     # -------------------------------------------------------------------------
     # Plot: x = feature value, y = SHAP(feature)
     # -------------------------------------------------------------------------
+    algos = ["xgb", "catboost", "lightgbm", "rf"]
+    palette = sns.color_palette("tab10", n_colors=len(algos))
+    algo_to_color = {algo: palette[i] for i, algo in enumerate(algos)}
     fig = go.Figure()
 
     fig.add_trace(
         go.Scatter(
             x=x_vals,
-            y=shap_xgb,
+            y=y_xgb,
             mode="markers",
-            marker=dict(color=color_xgb, opacity=0.35),
+            marker=dict(color=algo_to_color["xgb"], opacity=0.35),
             name="XGBoost",
         )
     )
     fig.add_trace(
         go.Scatter(
             x=x_vals,
-            y=shap_lgbm,
+            y=y_lgbm,
             mode="markers",
-            marker=dict(color=color_lgbm, opacity=0.35),
+            marker=dict(color=algo_to_color["lightgbm"], opacity=0.35),
             name="LightGBM",
         )
     )
     fig.add_trace(
         go.Scatter(
             x=x_vals,
-            y=shap_cat,
+            y=y_cat,
             mode="markers",
-            marker=dict(color=color_catboost, opacity=0.35),
+            marker=dict(color=algo_to_color["catboost"], opacity=0.35),
             name="CatBoost",
         )
     )
-    # fig.add_trace(
-    #     go.Scatter(
-    #         x=x_vals,
-    #         y=shap_rf,
-    #         mode="markers",
-    #         marker=dict(color=color_rf, opacity=0.35),
-    #         name="Random Forest",
-    #     )
-    # )
+    fig.add_trace(
+        go.Scatter(
+            x=x_vals,
+            y=y_rf,
+            mode="markers",
+            marker=dict(color=algo_to_color["rf"], opacity=0.35),
+            name="Random Forest",
+        )
+    )
 
     fig.update_layout(
-        title=f"SHAP values for feature '{column_name}' (4 models)",
+        title=f"SHAP values for feature '{column_name}' (4 models, precomputed)",
         xaxis_title=column_name,
         yaxis_title="SHAP value",
         width=1400 * 0.9,
@@ -1089,7 +992,7 @@ def plot_shap_multi_models(
         margin=dict(l=40, r=40, b=60, t=60),
     )
 
-    # boxed axes
+    # Boxed axes
     fig.update_xaxes(
         showline=True,
         linewidth=2,
@@ -1113,7 +1016,7 @@ def plot_shap_multi_models(
         title_font=dict(size=18, color="black"),
     )
 
-    # zero line
+    # Zero line
     fig.add_shape(
         type="line",
         xref="paper",

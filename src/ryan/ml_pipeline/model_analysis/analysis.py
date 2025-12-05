@@ -970,7 +970,7 @@ def plot_shap_multi_models(
     )
 
     fig.update_layout(
-        title=f"SHAP values for feature '{column_name}",
+        title=f"SHAP values for feature {column_name}",
         xaxis_title=column_name,
         yaxis_title="SHAP value",
         width=1400 * 0.9,
@@ -1173,7 +1173,7 @@ def plot_shap_multi_products(
         )
 
     fig.update_layout(
-        title=f"SHAP values for feature '{column_name}' across products",
+        title=f"SHAP values for feature {column_name} across products",
         xaxis_title=column_name,
         yaxis_title="SHAP value",
         width=1400 * 0.9,

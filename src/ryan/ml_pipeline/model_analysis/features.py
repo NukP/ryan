@@ -67,7 +67,20 @@ X_ENGINEERED = [
     "delta_Eapp_fluctuation",
 ]
 
+# When looop through feature in the raw dataset.
 PRODUCTS = ["fe-H2", "fe-C2H4", "fe-CH4", "fe-1-propanol", "fe-Acetaldehyde", "fe-EtOH"]
+
+# Use for looping and only require product names.
+PRODUCTS_NAME = [item.split("fe-")[1] for item in PRODUCTS]
+
+# Use for plotting
+DICT_PRODUCT_LABEL = {
+    "H2": "H$_{2}$",
+    "C2H4": "C$_{2}$H$_{4}$",
+    "CH4": "CH$_{4}$",
+    "1-propanol": "1-Propanol",
+    "EtOH": "Ethanol",
+}
 
 X_ALL_NUMERICAL = X_RAW_DATA + X_ENGINEERED + X_METADATA_NUMERICAL
 

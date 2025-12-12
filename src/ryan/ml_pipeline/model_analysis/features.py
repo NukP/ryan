@@ -78,6 +78,7 @@ DICT_PRODUCT_LABEL = {
     "H2": "H$_{2}$",
     "C2H4": "C$_{2}$H$_{4}$",
     "CH4": "CH$_{4}$",
+    "Acetaldehyde": "Acetaldehyde",
     "1-propanol": "1-Propanol",
     "EtOH": "Ethanol",
 }

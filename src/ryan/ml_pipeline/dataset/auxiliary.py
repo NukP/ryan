@@ -5,6 +5,7 @@ import os
 import time
 from typing import TYPE_CHECKING, Dict, List, Tuple, Union
 
+import numpy as np
 import pandas as pd
 
 # I put this to avoid cyclical import issues.

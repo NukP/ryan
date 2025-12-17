@@ -587,3 +587,65 @@ def table_lookup(df: pd.DataFrame, col_to_look: str, row_to_look: str, col_to_ma
         return obtained_value.item()
 
     return obtained_value
+
+
+def table_lookup(df: pd.DataFrame, col_to_look: str, row_to_look: str, col_to_match: str) -> Union[str, float, None]:
+    """
+    Retrieve a value from a DataFrame by matching a row value in one column
+    and returning the corresponding value from another column.
+
+    The lookup logic is illustrated below:
+
+    +-------------+--------------------+
+    | col_to_look | col_to_match       |
+    +=============+====================+
+    | ...         | ...                |
+    +-------------+--------------------+
+    | row_to_look | return this value  |
+    +-------------+--------------------+
+
+    Args:
+        df:
+            Input DataFrame.
+        col_to_look:
+            Name of the column used to locate the target row.
+        row_to_look:
+            Value in ``col_to_look`` used to identify the row.
+        col_to_match:
+            Name of the column from which the value is returned.
+
+    Returns:
+        The value from ``col_to_match`` corresponding to the row where
+        ``df[col_to_look] == row_to_look``. Returns ``None`` if no match is found.
+
+    Raises:
+        KeyError:
+            If ``col_to_look`` or ``col_to_match`` is not in ``df.columns``.
+        ValueError:
+            If multiple matching rows are found.
+    """
+    # Remove trailing spaces only
+    if isinstance(row_to_look, str) and row_to_look.endswith(" "):
+        row_to_look = row_to_look.rstrip(" ")
+
+    if col_to_look not in df.columns:
+        raise KeyError(f"Column '{col_to_look}' not found in DataFrame.")
+
+    if col_to_match not in df.columns:
+        raise KeyError(f"Column '{col_to_match}' not found in DataFrame.")
+
+    mask = df[col_to_look] == row_to_look
+    result = df.loc[mask, col_to_match]
+
+    if result.empty:
+        return None
+
+    if len(result) > 1:
+        raise ValueError("Multiple matching rows found.")
+
+    obtained_value = result.iloc[0]
+
+    if isinstance(obtained_value, np.generic):
+        return obtained_value.item()
+
+    return obtained_value

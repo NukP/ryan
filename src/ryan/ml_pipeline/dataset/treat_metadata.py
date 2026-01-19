@@ -33,7 +33,7 @@ def cathode_gas_flow(data_package: main.DataPackage) -> float:
 def cathode_gas_mix(data_package: main.DataPackage) -> str:
     """Return gas mixture in cathode compartment."""
     string_value = aux.get_metadata_cell_value(
-        column_name="Anode gas mixture and concentration [chemical formula, mol fraction]", data_package=data_package
+        column_name="Cathode gas mixture and concentration [chemical formula, mol fraction]", data_package=data_package
     )
     converted_dict = aux.pseudolist_conv(string_value)
     gas = list(converted_dict.keys())[0]

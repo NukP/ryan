@@ -72,8 +72,8 @@ def cathodic_hydrogencarbonate_ion_conc(data_package: main.DataPackage) -> float
     return aux.cal_cathode_ions(data_package)["HCO3-"]
 
 
-def cathode_volumne(data_package: main.DataPackage) -> float:
-    """Return volumn of cathode electrolyte in mL."""
+def cathode_volume(data_package: main.DataPackage) -> float:
+    """Return volume of cathode electrolyte in mL."""
     return aux.get_metadata_cell_value(column_name="Cathode compartment electrolyte volume", data_package=data_package)
 
 
@@ -93,7 +93,7 @@ def anode_electrolyte_ph(data_package: main.DataPackage) -> float:
 
 
 def anode_electrolyte_volume(data_package: main.DataPackage) -> float:
-    """Return the volumn of anode electrolyte."""
+    """Return the volume of anode electrolyte."""
     return aux.get_metadata_cell_value(column_name="Anode compartment electrolyte volume", data_package=data_package)
 
 

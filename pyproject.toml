@@ -39,7 +39,8 @@ analysis = [
     "dgpost",
     "ipykernel",
     "silx[qt]",
-    "netCDF4"
+    "netCDF4",
+    "pyqt5>=5.15.11",
 ]
 
 ml_pipeline = [

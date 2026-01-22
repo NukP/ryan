@@ -1,0 +1,10 @@
+Help me refractor  gen_dataset in the following ways:
+Currently, this function receive a str which is a path to a folder containing files for to be used to generate the dataset. The function itself requires 3 files per experiment to be used to generate the dataset: gc_excel_file, electro_file, and metadata file. In this old version, all of these files per each experiment will be put inside one folder. The path of this folder is given in gc_excel_dir to the function. The function will then use its helper function to first extract a list of all gc_excel_file, electro_file, and metadata file for each exp. While this is working fine, I constantly need to throw files into this folder and it’s kinda redundant. So, I’d like to instead give a dictionary instead. My dictionary will structure like this
+
+{“exp_name”:{"path_gc_file" : path_gc_excel,
+                  "path_electro_file": path_electro_excel,
+                  "path_metadata_file": path_metadata_excel}
+}
+
+I want you to help me refractor gen_dataset function and its helper function to receive path to files in dicts instead.
+I expect the functino to loop throw all member in this list (represt all experiment I wanna fed into the dataset generation)

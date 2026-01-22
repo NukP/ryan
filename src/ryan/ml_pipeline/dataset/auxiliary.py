@@ -68,7 +68,17 @@ def get_time_slot(time_slot_option: str, data_package: "DataPackage") -> Tuple[f
 
 
 def process_row(
-    args_tuple: Tuple[bool, int, Dict[str, pd.DataFrame], List[str], List[str], List[str], bool, str, str],
+    args_tuple: Tuple[
+        str,
+        int,
+        Dict[str, Dict[str, pd.DataFrame]],
+        List[str],
+        List[str],
+        List[str],
+        List[str],
+        bool,
+        dict,
+    ],
 ) -> Dict[str, Union[int, str, float]]:
     """
     A function used for extracting and calculating values for engineered features in main.gen_dataset.
@@ -85,7 +95,7 @@ def process_row(
     from .main import DataPackage
 
     (
-        pass_fl,
+        exp_name,
         idx,
         dict_df,
         ls_input_gen,
@@ -93,20 +103,30 @@ def process_row(
         ls_output_extract,
         ls_output_gen,
         pre_gen_electro_df,
-        gc_excel_dir,
+        exp_entry,
     ) = args_tuple
-    row_data = {col: dict_df[pass_fl.split(".xlsx")[0]].loc[idx, col] for col in ls_input_extract + ls_output_extract}
+    df_gc = dict_df[exp_name]["gc"]
+    row_data = {col: df_gc.loc[idx, col] for col in ls_input_extract + ls_output_extract}
+    gc_path = exp_entry["path_gc_file"]
+    gc_name = os.path.basename(gc_path)
+    gc_dir = os.path.dirname(gc_path) or "."
     if pre_gen_electro_df:
-        fln_electro = pass_fl.split(".")[0] + ".electro"
         data_pack = DataPackage(
-            df_gc=dict_df[pass_fl.split(".xlsx")[0]],
-            df_electro=dict_df[fln_electro],
+            df_gc=df_gc,
+            df_electro=dict_df[exp_name]["electro"],
             idx=idx,
-            fln=pass_fl,
-            dir=gc_excel_dir,
+            fln=gc_name,
+            dir=gc_dir,
+            metadata_path=exp_entry.get("path_metadata_file"),
         )
     else:
-        data_pack = DataPackage(df_gc=dict_df[pass_fl.split(".xlsx")[0]], idx=idx, fln=pass_fl, dir=gc_excel_dir)
+        data_pack = DataPackage(
+            df_gc=df_gc,
+            idx=idx,
+            fln=gc_name,
+            dir=gc_dir,
+            metadata_path=exp_entry.get("path_metadata_file"),
+        )
     ls_t_genfunc = []
     for gen_func in ls_output_gen + ls_input_gen:
         ts_genfunc = time.time()
@@ -118,31 +138,31 @@ def process_row(
     return row_data
 
 
-def read_excel(args: Tuple[str, str]) -> Tuple[str, pd.DataFrame]:
+def read_excel(args: Tuple[str, str, str]) -> Tuple[str, str, pd.DataFrame]:
     """
     Function used in generating dict of df using multi processing library.
 
     Args:
-        args: Tuple containing (fln, dir_path): Excel filename and directory path.
+        args: Tuple containing (exp_name, file_kind, path_fl): experiment name, file kind, and full path.
 
     Returns:
-        Tuple[str, pd.Dataframe]: [os.path.basename(fln).split(".xlsx")[0], df] Name of the file and pd.Dataframe read from the file
+        Tuple[str, str, pd.Dataframe]: (exp_name, file_kind, df) Name of the experiment, file kind, and pd.Dataframe read from the file
         (with some modification based on type of files.)
     """
     from .main import mod_df
 
-    fln, dir_path = args
-    path_fl = os.path.join(dir_path, fln)
-    if fln.split(".")[1] == "electro":
+    exp_name, file_kind, path_fl = args
+    if file_kind == "electro":
         df = pd.read_excel(path_fl, skiprows=[1])
-    elif fln.split(".")[1] == "GCdata":
+    elif file_kind == "gc":
         try:
             df = mod_df(path_fl)
         except Exception as e:
-            print(f"Failed to generate df from file: {fln}: {e}")
+            print(f"Failed to generate df from file: {path_fl}: {e}")
     else:
-        print(f"Warning: invalid file type: {fln}")
-    return os.path.basename(fln).split(".xlsx")[0], df
+        print(f"Warning: invalid file type: {path_fl}")
+        df = pd.DataFrame()
+    return exp_name, file_kind, df
 
 
 def t_to_idx(df: pd.DataFrame, t: float) -> float:
@@ -374,10 +394,13 @@ def get_metadata_cell_value(column_name: str, data_package: "DataPackage") -> Un
     Returns:
         Union[str, float]: The value found in the 'Value' column for the given column name.
     """
-    fln = data_package.fln
-    fl_dir = data_package.dir
-    metadata_fln = fln.split(".")[0].split("datagram_")[1] + "-metadata.xlsx"
-    dir_fl_metadata = os.path.join(fl_dir, metadata_fln)
+    if data_package.metadata_path:
+        dir_fl_metadata = data_package.metadata_path
+    else:
+        fln = data_package.fln
+        fl_dir = data_package.dir
+        metadata_fln = fln.split(".")[0].split("datagram_")[1] + "-metadata.xlsx"
+        dir_fl_metadata = os.path.join(fl_dir, metadata_fln)
     df_metadata = pd.read_excel(dir_fl_metadata)
     # Remove leading and trailing whitespace from column names
     df_metadata.columns = df_metadata.columns.str.strip()

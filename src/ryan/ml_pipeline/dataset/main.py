@@ -27,12 +27,14 @@ class DataPackage:
     df_electro: pd.DataFrame = None  # type: ignore
     fl_dir: str = None  # type: ignore
     fl_electro_dir: str = None  # type: ignore
+    metadata_path: str = None  # type: ignore
     # dir_datagram: str = None  # type: ignore
 
     def __post_init__(self):
-        self.fl_dir = os.path.join(self.dir, self.fln)
-        fln_electro = self.fln.split(".")[0] + ".electro.xlsx"
-        self.fl_electro_dir = os.path.join(self.dir, fln_electro)
+        if self.dir and self.fln:
+            self.fl_dir = os.path.join(self.dir, self.fln)
+            fln_electro = self.fln.split(".")[0] + ".electro.xlsx"
+            self.fl_electro_dir = os.path.join(self.dir, fln_electro)
         # self.dir_datagram = os.path.join(self.dir, self.fln.split(".")[0] + ".nc")
 
 
@@ -63,18 +65,53 @@ def mod_df(fl_excel: str) -> pd.DataFrame:
     return dataframe
 
 
-def gen_all_excel_ls(excel_fol_dir: str) -> list:
+def gen_all_excel_ls(experiment_files) -> list:
     """
-    This function returns a list of all of the Excel files that ends with GCdata.xlsx.
+    This function returns a list of experiment file entries for dataset generation.
 
     Args:
-        excel_fol_dir (str): Path to the folder containing the excel files
+        experiment_files (dict | list): Mapping of experiment name to file paths, a single experiment entry,
+            or a list of experiment entries.
 
     Returns:
-        list:  List containing the file name of the excel files that ends with GCdata.xlsx in the given excel_fol_dir
+        list: List of dicts containing experiment name and file paths.
     """
-    ls_gcexcel_all = [fl_excel for fl_excel in os.listdir(excel_fol_dir) if fl_excel.endswith("GCdata.xlsx")]
-    return ls_gcexcel_all
+    if isinstance(experiment_files, dict) and "path_gc_file" in experiment_files:
+        gc_path = experiment_files.get("path_gc_file")
+        exp_name = experiment_files.get("exp_name")
+        if not exp_name:
+            exp_name = os.path.basename(str(gc_path)).split(".")[0]
+        return [{"exp_name": exp_name, **experiment_files}]
+    if isinstance(experiment_files, list):
+        normalized = []
+        for entry in experiment_files:
+            if not isinstance(entry, dict) or "path_gc_file" not in entry:
+                raise TypeError(
+                    "Each experiment entry in the list must be a dict with file paths (path_gc_file, path_electro_file, path_metadata_file)."
+                )
+            gc_path = entry.get("path_gc_file")
+            exp_name = entry.get("exp_name")
+            if not exp_name:
+                exp_name = os.path.basename(str(gc_path)).split(".")[0]
+            normalized.append({"exp_name": exp_name, **entry})
+        return normalized
+    normalized = []
+    for exp_name, paths in experiment_files.items():
+        if isinstance(paths, dict):
+            normalized.append({"exp_name": exp_name, **paths})
+            continue
+        if isinstance(paths, (list, tuple)) and len(paths) == 3:
+            normalized.append({
+                "exp_name": exp_name,
+                "path_gc_file": paths[0],
+                "path_electro_file": paths[1],
+                "path_metadata_file": paths[2],
+            })
+            continue
+        raise TypeError(
+            "Each experiment entry must be a dict with file paths or a 3-item (gc, electro, metadata) tuple/list."
+        )
+    return normalized
 
 
 def condition_fln_check_word(item: str, word: str) -> bool:
@@ -95,21 +132,21 @@ def condition_fln_check_word(item: str, word: str) -> bool:
 def gen_fil_excel_ls(conditions_to_check: list, ls_pre_fil: list) -> list:
     """
     This function take the list of all of the GC Excel files and filter out according to the given conditions. The
-    function returns list of file name of the GC Excel file whcih pass the given conditions.
+    function returns list of experiment entries which pass the given conditions.
 
     Args:
         conditions_to_check (list): List contains filtering condition.
-        ls_pre_fil (list): List contains file name of GC Excel file to be filtered.
+        ls_pre_fil (list): List contains experiment entries to be filtered.
 
     Returns:
-        list: List containing filtered GC Excel file.
+        list: List containing filtered experiment entries.
     """
 
     def check_all_conditions(item):
-        return all(condition(item) for condition in conditions_to_check)
+        gc_name = os.path.basename(item["path_gc_file"])
+        return all(condition(gc_name) for condition in conditions_to_check)
 
-    ls_fln_filtered = [fln for fln in ls_pre_fil if check_all_conditions(fln)]
-    return ls_fln_filtered
+    return [entry for entry in ls_pre_fil if check_all_conditions(entry)]
 
 
 def condition_idx_check_fe_exceed(df: pd.DataFrame, idx: int, treshold: int = 1) -> bool:
@@ -148,7 +185,7 @@ def gen_fil_idx_ls(conditions_idx: list, df: pd.DataFrame) -> list:
 
 
 def gen_dataset(
-    gc_excel_dir: str,
+    experiment_files: dict,
     conditions_fln: list = [],
     conditions_idx: list = [],
     ls_input_extract: list = [],
@@ -174,8 +211,9 @@ def gen_dataset(
     num_cpu args. Note that this only control the number of cpu used in aux.process_row and not during the dict_df loading.
 
     Args:
-        gc_excel_dir (str): Path to a folder containing a GC Excel files.
-        conditions_fln (list, optional): List containing functions for filtering file name. Defaults to [].
+        experiment_files (dict): Mapping of experiment name to file paths (gc, electro, metadata).
+            Expected keys per experiment: path_gc_file, path_electro_file, path_metadata_file.
+        conditions_fln (list, optional): List containing functions for filtering GC file name. Defaults to [].
         conditions_idx (list, optional): List containing functions for filtering row (index). Defaults to [].
         ls_input_extract (list, optional): List of column to be extracted from the respective GC Excel file.
             These colums will be placed first as they are regard as the input for the dataset (for machine learning purpose). Defaults to [].
@@ -209,21 +247,22 @@ def gen_dataset(
     df_dataset = pd.DataFrame(columns=ls_header)
 
     # Filtering gc_excel files using keyword in the file name.
-    ls_gcexcell_all = gen_all_excel_ls(gc_excel_dir)
-    ls_gcexcel_fil = gen_fil_excel_ls(conditions_fln, ls_gcexcell_all)
-    ls_electroexcel = [fl.split(".")[0] + ".electro.xlsx" for fl in ls_gcexcel_fil]
+    ls_exp_all = gen_all_excel_ls(experiment_files)
+    ls_exp_fil = gen_fil_excel_ls(conditions_fln, ls_exp_all)
+    exp_map = {entry["exp_name"]: entry for entry in ls_exp_fil}
 
     if pre_gen_electro_df:
-        list_fl = ls_gcexcel_fil + ls_electroexcel
+        list_fl = [(exp_name, "gc", exp_entry["path_gc_file"]) for exp_name, exp_entry in exp_map.items()] + [
+            (exp_name, "electro", exp_entry["path_electro_file"]) for exp_name, exp_entry in exp_map.items()
+        ]
     else:
-        list_fl = ls_gcexcel_fil
+        list_fl = [(exp_name, "gc", exp_entry["path_gc_file"]) for exp_name, exp_entry in exp_map.items()]
     dict_df = {}
     start_time = time.time()
     print("Start loading associated Excel files process.")
     with Pool(processes=cpu_count()) as pool:
-        args_list = [(fln, gc_excel_dir) for fln in list_fl]
-        for fln, df in tqdm(pool.imap_unordered(aux.read_excel, args_list), total=len(args_list)):
-            dict_df[fln] = df
+        for exp_name, file_kind, df in tqdm(pool.imap_unordered(aux.read_excel, list_fl), total=len(list_fl)):
+            dict_df.setdefault(exp_name, {})[file_kind] = df
     print("Excel loading completed.\n")
     end_time = time.time()
     run_h, run_m, run_s = aux.convert_seconds(end_time - start_time)  # type: ignore
@@ -234,15 +273,15 @@ def gen_dataset(
     # Filtering idx in each file.
     print("Start extracting and calculating values for features for each Index. \n")
     ls_flidx_to_process = []
-    for pass_fl in ls_gcexcel_fil:
-        ls_fil_idx = gen_fil_idx_ls(conditions_idx, dict_df[pass_fl.split(".xlsx")[0]])
+    for exp_name, exp_entry in exp_map.items():
+        ls_fil_idx = gen_fil_idx_ls(conditions_idx, dict_df[exp_name]["gc"])
 
         for idx in ls_fil_idx:
-            ls_flidx_to_process.append((pass_fl, idx))
+            ls_flidx_to_process.append((exp_name, idx))
     total_rows = len(ls_flidx_to_process)
     process_args = [
         (
-            pass_fl,
+            exp_name,
             idx,
             dict_df,
             ls_input_gen,
@@ -250,9 +289,9 @@ def gen_dataset(
             ls_output_extract,
             ls_output_gen,
             pre_gen_electro_df,
-            gc_excel_dir,
+            exp_map[exp_name],
         )
-        for pass_fl, idx in ls_flidx_to_process
+        for exp_name, idx in ls_flidx_to_process
     ]
 
     if not num_cpu:

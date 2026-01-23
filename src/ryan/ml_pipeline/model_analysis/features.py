@@ -16,7 +16,7 @@ X_METADATA_NUMERICAL = [
     "cathodic_potassium_ion_conc",
     "cathodic_sodium_ion_conc",
     "cathodic_hydrogencarbonate_ion_conc",
-    "cathode_volumne",
+    "cathode_volumn",
     "anode_electrolyte_flow",
     "anode_electrolyte_ph",
     "anode_electrolyte_volume",

@@ -282,7 +282,7 @@ def plot_commulative_histogram(
     Returns:
     None
     """
-    _, ax = plt.subplots()
+    _, ax = plt.subplots(figsize=(12, 5))
     ax.minorticks_on()
 
     # Get histogram data
@@ -312,7 +312,7 @@ def plot_commulative_histogram(
 
     if dir_save_fig is not None:
         filename = f"{dir_save_fig}/{column_name}_cumulative_histogram.png"
-        plt.savefig(filename, bbox_inches="tight")
+        plt.savefig(filename, bbox_inches="tight", dpi=300)
     plt.show()
 
 

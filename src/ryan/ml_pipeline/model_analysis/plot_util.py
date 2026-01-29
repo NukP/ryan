@@ -3,6 +3,7 @@ This module contains functions for facilitating loading frequently-used files su
 This makes importing files seamless across notebook located at different directory.
 """
 
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -39,7 +40,7 @@ def get_path_from_root_dir(target_filename: str, dir_project_root: Path | None =
     Locate a unique file or directory name under the project root.
 
     Args:
-        target_filename: File or directory name to search for under the project root.
+        target_filename: File name to search for under the project root.
         dir_project_root: Project root to search within. Defaults to find_project_root().
 
     Returns:
@@ -60,12 +61,37 @@ def get_path_from_root_dir(target_filename: str, dir_project_root: Path | None =
     return ls_target_path[0]
 
 
-def get_df_dataset(
-    path_root_project: Path | None = None, dataset_path_from_root: Path | None = None, dataset_filename: str = ""
-) -> pd.DataFrame:
-    if path_root_project is None:
-        path_root_project = find_project_root()
-    if dataset_path_from_root is not None:
-        path_dataset = path_root_project / dataset_path_from_root
-    else:
-        pass  # continue from this
+def get_df_dataset(path_dataset: Path | None = None) -> pd.DataFrame:
+    """
+    Load the dataset into a DataFrame, dropping rows with missing values.
+
+    Args:
+        path_dataset: Path to the dataset file. If None, searches the project root
+            for the default dataset filename.
+
+    Returns:
+        A pandas DataFrame containing the dataset with NaNs removed.
+    """
+    if path_dataset is None:
+        path_dataset = get_path_from_root_dir("dataset_22Jan20226_itteration6_CO2only.xlsx")
+    df_dataset = pd.read_excel(path_dataset)
+    df_dataset = df_dataset.dropna()
+    return df_dataset
+
+
+def get_dict_best_params(path_json_best_params: Path | None = None) -> dict:
+    """
+    Load the best-parameters (from hyperparameter tuning) JSON file into a dictionary.
+
+    Args:
+        path_json_best_params: Path to the JSON file. If None, searches the project
+            root for the default filename.
+
+    Returns:
+        A dict containing the best hyperparameters.
+    """
+    if path_json_best_params is None:
+        path_json_best_params = get_path_from_root_dir("summarized_model_hyperparameter.json")
+    with open(path_json_best_params, "r") as f:
+        dict_best_params = json.load(f)
+    return dict_best_params

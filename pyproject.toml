@@ -41,6 +41,7 @@ analysis = [
     "silx[qt]",
     "netCDF4",
     "pyqt5>=5.15.11",
+    "pybis"
 ]
 
 ml_pipeline = [

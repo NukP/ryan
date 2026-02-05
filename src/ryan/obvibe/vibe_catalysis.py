@@ -139,8 +139,8 @@ class Files:
 
     @property
     def dir_input_data_zip(self) -> Path:
-        """Path to the input_data_<exp_name>.zip file inside the temporary folder."""
-        path = self.dir_experiment_folder / "temporarily" / f"input_data_{self.exp_name}.zip"
+        """Path to the input_data.zip file inside the temporary folder."""
+        path = self.dir_experiment_folder / "temporarily" / "input_data.zip"
         if not path.exists():
             raise FileNotFoundError(f"Input data zip not found: {path}")
         return path
@@ -157,9 +157,10 @@ class Files:
 def manage_files(dir_experiment_folder: Path):
     """Prepare experiment files into structured zip archives for OpenBis upload.
 
-    The function organizes selected files from the experiment folder into
-    `input_data` and `output_data` directories, then zips them into
-    `input_data.zip` and `output_data.zip` inside a temporary folder.
+    The function copies a single `datagram*.zip` file from the experiment folder
+    into the temporary folder as `input_data.zip` (without modifying the original),
+    and collects selected result files into an `output_data` folder which is then
+    zipped for upload.
 
     Args:
         dir_experiment_folder (Path): Path to the folder containing the experiment data.
@@ -168,41 +169,20 @@ def manage_files(dir_experiment_folder: Path):
         None: The function modifies the filesystem by creating directories and zip archives.
     """
     # Create the temporarily folder for organizing files folders.
-    if not isinstance(dir_experiment_folder, Path):
-        Path(dir_experiment_folder)
+    dir_experiment_folder = Path(dir_experiment_folder)
     dir_temp = dir_experiment_folder / "temporarily"
     Path(dir_temp).mkdir(parents=True, exist_ok=True)
-    dir_input_data = dir_temp / "input_data"
-    Path(dir_input_data).mkdir(parents=True, exist_ok=True)
     dir_output_data = dir_temp / "output_data"
     Path(dir_output_data).mkdir(parents=True, exist_ok=True)
 
-    # Copy files into input folder
-    zip_files = list(dir_experiment_folder.glob("*.zip"))
-    if len(zip_files) == 1:
-        from zipfile import ZipFile
-
-        with ZipFile(zip_files[0], "r") as zf:
-            for file_name in zf.namelist():
-                if file_name.endswith(".mps") or file_name.endswith(".mpr") or file_name.endswith("-GC.zip"):
-                    source_path = zf.extract(file_name, dir_temp)
-                    shutil.copy2(source_path, dir_input_data / Path(file_name).name)
-
-    # lc_files = list(dir_experiment_folder.glob("*-LC.xlsx"))
-    # if len(lc_files) == 1:
-    #     shutil.copy2(lc_files[0], dir_input_data)
-
-    flow_file = dir_experiment_folder / "flow_for_yadg.csv"
-    if flow_file.exists():
-        shutil.copy2(flow_file, dir_input_data / "flow_data.csv")
-
-    pressure_file = dir_experiment_folder / "pressure_for_yadg.csv"
-    if pressure_file.exists():
-        shutil.copy2(pressure_file, dir_input_data / "pressure_data.csv")
-
-    temperature_file = dir_experiment_folder / "temperature_for_yadg.csv"
-    if temperature_file.exists():
-        shutil.copy2(temperature_file, dir_input_data / "temperature_data.csv")
+    # Input data: exactly one "datagram*.zip" in the experiment folder.
+    datagram_zip_files = list(dir_experiment_folder.glob("datagram*.zip"))
+    if len(datagram_zip_files) != 1:
+        raise ValueError(
+            f"Expected exactly 1 input datagram zip matching 'datagram*.zip' in {dir_experiment_folder}, "
+            f"found {len(datagram_zip_files)}."
+        )
+    shutil.copy2(datagram_zip_files[0], dir_temp / "input_data.zip")
 
     # Copy files into output folder
     src_recipe = dir_experiment_folder / "recipe_for_dgbowl"
@@ -224,7 +204,6 @@ def manage_files(dir_experiment_folder: Path):
 
     # zip the input and output data folders
     folder = Files(dir_experiment_folder)
-    shutil.make_archive(str(dir_temp / f"input_data_{folder.exp_name}"), "zip", dir_input_data)
     shutil.make_archive(str(dir_temp / f"output_data_{folder.exp_name}"), "zip", dir_output_data)
 
 

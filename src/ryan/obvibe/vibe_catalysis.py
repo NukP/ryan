@@ -139,8 +139,8 @@ class Files:
 
     @property
     def dir_input_data_zip(self) -> Path:
-        """Path to the input_data.zip file inside the temporary folder."""
-        path = self.dir_experiment_folder / "temporarily" / "input_data.zip"
+        """Path to the input_data_<exp_name>.zip file inside the temporary folder."""
+        path = self.dir_experiment_folder / "temporarily" / f"input_data_{self.exp_name}.zip"
         if not path.exists():
             raise FileNotFoundError(f"Input data zip not found: {path}")
         return path
@@ -158,7 +158,7 @@ def manage_files(dir_experiment_folder: Path):
     """Prepare experiment files into structured zip archives for OpenBis upload.
 
     The function copies a single `datagram*.zip` file from the experiment folder
-    into the temporary folder as `input_data.zip` (without modifying the original),
+    into the temporary folder as `input_data_<exp_name>.zip` (without modifying the original),
     and collects selected result files into an `output_data` folder which is then
     zipped for upload.
 
@@ -182,7 +182,6 @@ def manage_files(dir_experiment_folder: Path):
             f"Expected exactly 1 input datagram zip matching 'datagram*.zip' in {dir_experiment_folder}, "
             f"found {len(datagram_zip_files)}."
         )
-    shutil.copy2(datagram_zip_files[0], dir_temp / "input_data.zip")
 
     # Copy files into output folder
     src_recipe = dir_experiment_folder / "recipe_for_dgbowl"
@@ -205,6 +204,7 @@ def manage_files(dir_experiment_folder: Path):
     # zip the input and output data folders
     folder = Files(dir_experiment_folder)
     shutil.make_archive(str(dir_temp / f"output_data_{folder.exp_name}"), "zip", dir_output_data)
+    shutil.copy2(datagram_zip_files[0], dir_temp / f"input_data_{folder.exp_name}.zip")
 
 
 def experiment_upload(
